@@ -179,10 +179,8 @@ def delete_project_mapping(project_id, distro_name, pkg_name):
             SESSION.commit()
 
             flask.flash('Mapping for %s has been removed' % project.name)
-            return flask.redirect(flask.url_for('projects'))
-        else:
-            return flask.redirect(
-                flask.url_for('project', project_id=project.id))
+        return flask.redirect(
+            flask.url_for('project', project_id=project.id))
 
     return flask.render_template(
         'regex_delete.html',
@@ -190,6 +188,7 @@ def delete_project_mapping(project_id, distro_name, pkg_name):
         project=project,
         package=package,
         form=form)
+
 
 @APP.route('/logs')
 @login_required
