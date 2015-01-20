@@ -1,0 +1,95 @@
+{% extends "master.html" %}
+
+{% block body %}
+
+<div class="page-header">
+  <h1>Search projects{% if distroname %} in {{ distroname }}{% endif %}</h1>
+</div>
+
+<div class="row show-grid">
+  <div class="col-sm-6">
+    {% if total_page > 1 %}
+    <ul class="pagination pagination-sm">
+        <li>
+            {% if page > 1%}
+              <a href="{{ url_for('projects_search') }}?page={{page - 1}}&pattern={{pattern}}">
+                «
+              </a>
+            {% else %}
+              <a href="{{url_for('projects_search')}}?page={{page}}&pattern={{pattern}}">
+                «
+              </a>
+            {% endif %}
+        </li>
+        <li>
+            <a> {{ page }} / {{ total_page }} </a>
+        </li>
+        <li>
+            {% if page < total_page %}
+              <a href="{{ url_for('projects_search') }}?page={{page + 1}}&pattern={{pattern}}">
+                »
+              </a>
+            {% else %}
+              <a href="{{ url_for('projects_search') }}?page={{page}}&pattern={{pattern}}">
+                »
+              </a>
+            {% endif %}
+        </li>
+    </ul>
+    {% endif %}
+  </div>
+
+  <div class="col-sm-6">
+    {% if distroname %}
+    <form action="{{ url_for('distro_projects_search', distroname=distroname)
+     }}" role="form">
+    {% else %}
+    <form action="{{ url_for('projects_search') }}" role="form">
+    {% endif %}
+      <div class="form-group">
+        <input type="text" name="pattern" placeholder="Project name" class="SearchBox" value="{{ pattern }}"/>
+        <button type="submit" class="btn btn-default">Search</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-6">
+    <p>{{ projects_count }} projects found</p>
+    <div class="list-group">
+    {% if projects %}
+      <span class="list-group-item">
+        <p class="list-group-item-text">
+          <dl class="dl-horizontal">
+            <table class="table table-condensed">
+            {% for project in projects %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('project', project_id=project.id) }}">
+                    {{project.name}}
+                  </a>
+                </td>
+                <td>
+                  <a href="{{ project.homepage }}" target="_blank">
+                    {{ project.homepage }}
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+            </table>
+          </dl>
+        </p>
+        <div class="clearfix"></div>
+      </span>
+    {% else %}
+    <blockquote>
+        Oups this is embarrassing, it seems that no projects are being
+        monitored currently.
+    </blockquote>
+    {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

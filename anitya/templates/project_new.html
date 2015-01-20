@@ -1,0 +1,135 @@
+{% extends "master.html" %}
+{% from "functions.html" import render_field_in_row %}
+
+{% block body %}
+
+<div class="page-header">
+  <h1>{{ context }} project</h1>
+</div>
+{% if context == 'Add' %}
+<form method="POST" action="{{ url_for('new_project') }}" >
+{% elif context == 'Edit' %}
+<form method="POST" action="{{ url_for('edit_project', project_id=project.id) }}" >
+{% endif %}
+  <div class="row">
+    <div class="col-md-6">
+      <p> {{ context }} your project to anitya</p>
+      <div class="list-group">
+        <span class="list-group-item">
+          <table class="table table-condensed">
+            <tr>
+              {{ render_field_in_row(form.name) }}
+            </tr>
+            <tr>
+              {{ render_field_in_row(form.homepage) }}
+            </tr>
+            <tr>
+              {{ render_field_in_row(form.backend) }}
+            </tr>
+            <tr id="version_url_row">
+              {{ render_field_in_row(form.version_url) }}
+            </tr>
+            <tr id="regex_row">
+              {{ render_field_in_row(form.regex) }}
+            </tr>
+            <tr id="examples_row">
+              <th>Examples:</th>
+              <td id="example_txt"></td>
+            </tr>
+
+            {% if context == 'Add' %}
+            <tr>
+              {{ render_field_in_row(form.distro) }}
+              <td></td>
+            </tr>
+            <tr>
+              {{ render_field_in_row(form.package_name) }}
+              <td></td>
+            </tr>
+            {% endif %}
+          </table>
+        </span>
+      </div>
+    </div>
+  </div>
+  <button type="submit" class="btn btn-success">
+    <span class="glyphicon glyphicon-plus"></span>
+    Submit
+  </button>
+  {% if context == 'Add' %}
+  <a href="{{ url_for('projects') }}">
+  {% elif context == 'Edit' %}
+  <a href="{{ url_for('project', project_id=project.id) }}">
+  {% endif %}
+    <button type="button" class="btn btn-danger">
+      <span class="glyphicon glyphicon-ban-circle"></span>
+      Cancel
+    </button>
+  </a>
+  {{ form.csrf_token }}
+</form>
+
+{% endblock %}
+
+
+{% block jscript %}
+<script type="text/javascript">
+
+    var examples = {};
+    {% for plugin in plugins %}
+    {% autoescape false  %}
+    examples["{{ plugin.name }}"]="{{ plugin.examples | format_examples }}";
+    {% endautoescape %}
+    {% endfor %}
+
+
+  function show_hide(){
+    $('#regex_row').hide();
+    $('#version_url_row').hide();
+    $("label[for='version_url']").text('Version URL');
+    var str = $( '#backend option:selected' ).text();
+    if (str == 'folder'){
+      $('#version_url_row').show();
+    };
+    if (str == 'Github'){
+        $("label[for='version_url']").text('Github owner/project');
+        $('#version_url_row').show();
+    };
+    if (str == 'Packagist'){
+        $("label[for='version_url']").text('Packagist owner/group');
+        $('#version_url_row').show();
+    };
+    if (str == 'Sourceforge'){
+        $("label[for='version_url']").text('Sourceforge name');
+        $('#version_url').after(
+        "<p>Use this field if the name used on the rss page of the project \
+        differs from the name of the project. </p>" );
+        $('#version_url_row').show();
+    };
+    if (str == 'custom'){
+      $('#regex_row').show();
+      $('#version_url_row').show();
+    };
+
+    $('#example_txt').html(examples[str]);
+
+  };
+
+  $(document).ready(function() {
+    show_hide();
+    $('#backend').change(function() {
+      show_hide();
+    });
+  });
+
+  $('body').bind('keyup', function(event) {
+    if (event.which == 27) { // esc
+      {% if context == 'Add' %}
+      window.location.replace("{{ url_for('projects') }}");
+      {% elif context == 'Edit' %}
+      window.location.replace("{{ url_for('project', project_id=project.id) }}");
+      {% endif %}
+    }
+  });
+</script>
+{% endblock %}

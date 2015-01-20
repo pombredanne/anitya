@@ -20,18 +20,20 @@
 #
 
 '''
-pkgdb tests.
+Anitya tests.
 '''
 
 __requires__ = ['SQLAlchemy >= 0.7']
 import pkg_resources
 
+import logging
 import unittest
 import sys
 import os
 
 from datetime import date
 from datetime import timedelta
+from functools import wraps
 
 from contextlib import contextmanager
 from flask import appcontext_pushed, g
@@ -43,22 +45,41 @@ from sqlalchemy.orm import scoped_session
 sys.path.insert(0, os.path.join(os.path.dirname(
     os.path.abspath(__file__)), '..'))
 
-from cnucnuweb.app import APP
-import cnucnuweb.model as model
+from anitya.app import APP
+import anitya.lib
+import anitya.lib.model as model
 
 #DB_PATH = 'sqlite:///:memory:'
 ## A file database is required to check the integrity, don't ask
-DB_PATH = 'sqlite:////tmp/cnucnuweb_test.sqlite'
-FAITOUT_URL = 'http://209.132.184.152/faitout/a'
+DB_PATH = 'sqlite:////tmp/anitya_test.sqlite'
+FAITOUT_URL = 'http://209.132.184.152/faitout/'
 
-try:
-    import requests
-    req = requests.get('%s/new' % FAITOUT_URL)
-    if req.status_code == 200:
-        DB_PATH = req.text
-        print 'Using faitout at: %s' % DB_PATH
-except:
-    pass
+if os.environ.get('BUILD_ID'):
+    try:
+        import requests
+        req = requests.get('%s/new' % FAITOUT_URL)
+        if req.status_code == 200:
+            DB_PATH = req.text
+            print 'Using faitout at: %s' % DB_PATH
+    except:
+        pass
+
+
+log = logging.getLogger('anitya.lib')
+anitya.lib.log.handlers = []
+log.handlers = []
+
+
+def skip_jenkins(function):
+    """ Decorator to skip tests if AUTH is set to False """
+    @wraps(function)
+    def decorated_function(*args, **kwargs):
+        """ Decorated function, actually does the work. """
+        if os.environ.get('BUILD_ID'):
+            raise unittest.SkipTest('Skip backend test on jenkins')
+        return function(*args, **kwargs)
+
+    return decorated_function
 
 
 class Modeltests(unittest.TestCase):
@@ -72,11 +93,13 @@ class Modeltests(unittest.TestCase):
     # pylint: disable=C0103
     def setUp(self):
         """ Set up the environnment, ran before every tests. """
-        if '///' in DB_PATH:
-            dbfile = DB_PATH.split('///')[1]
+        if ':///' in DB_PATH:
+            dbfile = DB_PATH.split(':///')[1]
             if os.path.exists(dbfile):
                 os.unlink(dbfile)
-        self.session = model.init(DB_PATH, create=True, debug=False)
+        self.session = anitya.lib.init(DB_PATH, create=True, debug=False)
+
+        anitya.lib.plugins.load_plugins(self.session)
 
     # pylint: disable=C0103
     def tearDown(self):
@@ -90,13 +113,10 @@ class Modeltests(unittest.TestCase):
         self.session.close()
 
         if DB_PATH.startswith('postgres'):
-            if 'localhost' in DB_PATH:
-                model.drop_tables(DB_PATH, self.session.bind)
-            else:
-                db_name = DB_PATH.rsplit('/', 1)[1]
-                req = requests.get(
-                    '%s/clean/%s' % (FAITOUT_URL, db_name))
-                print req.text
+            db_name = DB_PATH.rsplit('/', 1)[1]
+            req = requests.get(
+                '%s/clean/%s' % (FAITOUT_URL, db_name))
+            print req.text
 
 
 def create_distro(session):
@@ -116,25 +136,30 @@ def create_distro(session):
 
 def create_project(session):
     """ Create some basic projects to work with. """
-    project = model.Project(
+    anitya.lib.create_project(
+        session,
         name='geany',
         homepage='http://www.geany.org/',
+        version_url='http://www.geany.org/Download/Releases',
+        regex='DEFAULT',
+        user_mail='noreply@fedoraproject.org',
     )
-    session.add(project)
 
-    project = model.Project(
+    anitya.lib.create_project(
+        session,
         name='subsurface',
         homepage='http://subsurface.hohndel.org/',
+        version_url='http://subsurface.hohndel.org/downloads/',
+        regex='DEFAULT',
+        user_mail='noreply@fedoraproject.org',
     )
-    session.add(project)
 
-    project = model.Project(
+    anitya.lib.create_project(
+        session,
         name='R2spec',
         homepage='https://fedorahosted.org/r2spec/',
+        user_mail='noreply@fedoraproject.org',
     )
-    session.add(project)
-
-    session.commit()
 
 
 def create_package(session):
@@ -143,8 +168,6 @@ def create_package(session):
         project_id=1,
         distro='Fedora',
         package_name='geany',
-        version_url='http://www.geany.org/Download/Releases',
-        regex='DEFAULT',
     )
     session.add(package)
 
@@ -152,8 +175,6 @@ def create_package(session):
         project_id=2,
         distro='Fedora',
         package_name='subsurface',
-        version_url='http://subsurface.hohndel.org/downloads/',
-        regex='DEFAULT',
     )
     session.add(package)
 

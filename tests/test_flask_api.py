@@ -20,7 +20,7 @@
 #
 
 '''
-cnucnuweb tests for the flask API.
+anitya tests for the flask API.
 '''
 
 __requires__ = ['SQLAlchemy >= 0.7']
@@ -34,22 +34,23 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(
     os.path.abspath(__file__)), '..'))
 
-import cnucnuweb
-import cnucnuweb.model as model
+import anitya
+import anitya.lib.model as model
+from anitya.lib.backends import REGEX
 from tests import Modeltests, create_distro, create_project, create_package
 
 
-class CnucnuWebAPItests(Modeltests):
+class AnityaWebAPItests(Modeltests):
     """ Flask API tests. """
 
     def setUp(self):
         """ Set up the environnment, ran before every tests. """
-        super(CnucnuWebAPItests, self).setUp()
+        super(AnityaWebAPItests, self).setUp()
 
-        cnucnuweb.app.APP.config['TESTING'] = True
-        cnucnuweb.app.SESSION = self.session
-        cnucnuweb.api.SESSION = self.session
-        self.app = cnucnuweb.app.APP.test_client()
+        anitya.app.APP.config['TESTING'] = True
+        anitya.app.SESSION = self.session
+        anitya.api.SESSION = self.session
+        self.app = anitya.app.APP.test_client()
 
     def test_api_projects(self):
         """ Test the api_projects function of the API. """
@@ -75,20 +76,39 @@ class CnucnuWebAPItests(Modeltests):
         exp = {
             "projects": [
                 {
+                    "id": 1,
+                    "backend": "custom",
                     "homepage": "http://www.geany.org/",
                     "name": "geany",
+                    "regex": "DEFAULT",
+                    "version": None,
+                    "version_url": "http://www.geany.org/Download/Releases",
+                    "versions": []
                 },
                 {
+                    "id": 3,
+                    "backend": "custom",
                     "homepage": "https://fedorahosted.org/r2spec/",
                     "name": "R2spec",
+                    "regex": None,
+                    "version": None,
+                    "version_url": None,
+                    "versions": []
                 },
                 {
+                    "id": 2,
+                    "backend": "custom",
                     "homepage": "http://subsurface.hohndel.org/",
                     "name": "subsurface",
+                    "regex": "DEFAULT",
+                    "version": None,
+                    "version_url": "http://subsurface.hohndel.org/downloads/",
+                    "versions": []
                 }
             ],
             "total": 3
         }
+
         self.assertEqual(data, exp)
 
         output = self.app.get('/api/projects/?pattern=ge')
@@ -102,18 +122,54 @@ class CnucnuWebAPItests(Modeltests):
         exp = {
             "projects": [
                 {
+                    "id": 1,
+                    "backend": "custom",
                     "homepage": "http://www.geany.org/",
                     "name": "geany",
-                }
+                    "regex": "DEFAULT",
+                    "version": None,
+                    "version_url": "http://www.geany.org/Download/Releases",
+                    "versions": [],
+                },
             ],
             "total": 1
         }
+
         self.assertEqual(data, exp)
 
-    def test_api_projects_list(self):
-        """ Test the api_projects_list function of the API. """
+        output = self.app.get('/api/projects/?homepage=http://www.geany.org/')
+        self.assertEqual(output.status_code, 200)
+        data = json.loads(output.data)
+
+        for key in range(len(data['projects'])):
+            del(data['projects'][key]['created_on'])
+            del(data['projects'][key]['updated_on'])
+
+        exp = {
+            "projects": [
+                {
+                    "id": 1,
+                    "backend": "custom",
+                    "homepage": "http://www.geany.org/",
+                    "name": "geany",
+                    "regex": "DEFAULT",
+                    "version": None,
+                    "version_url": "http://www.geany.org/Download/Releases",
+                    "versions": [],
+                },
+            ],
+            "total": 1
+        }
+
+        self.assertEqual(data, exp)
+
+        output = self.app.get('/api/projects/?pattern=foo&homepage=bar')
+        self.assertEqual(output.status_code, 400)
+
+    def test_api_packages_wiki_list(self):
+        """ Test the api_packages_wiki_list function of the API. """
         create_distro(self.session)
-        output = self.app.get('/api/projects/wiki/')
+        output = self.app.get('/api/packages/wiki/')
         self.assertEqual(output.status_code, 200)
 
         self.assertEqual(output.data, '')
@@ -121,7 +177,7 @@ class CnucnuWebAPItests(Modeltests):
         create_project(self.session)
         create_package(self.session)
 
-        output = self.app.get('/api/projects/wiki/')
+        output = self.app.get('/api/packages/wiki/')
         self.assertEqual(output.status_code, 200)
 
         exp = "* geany DEFAULT http://www.geany.org/Download/Releases\n"\
@@ -170,10 +226,8 @@ class CnucnuWebAPItests(Modeltests):
     def test_api_get_version(self):
         """ Test the api_get_version function of the API. """
         create_distro(self.session)
-        output = self.app.post('/api/version')
-        self.assertEqual(output.status_code, 301)
 
-        output = self.app.post('/api/version/')
+        output = self.app.post('/api/version/get')
         self.assertEqual(output.status_code, 400)
         data = json.loads(output.data)
 
@@ -184,43 +238,67 @@ class CnucnuWebAPItests(Modeltests):
         create_package(self.session)
 
         data = {'id': 10}
-        output = self.app.post('/api/version/', data=data)
+        output = self.app.post('/api/version/get', data=data)
         self.assertEqual(output.status_code, 404)
         data = json.loads(output.data)
 
         exp = {"error": "No such project", "output": "notok"}
         self.assertEqual(data, exp)
 
+        # Modify the project so that it fails
+        project = model.Project.get(self.session, 1)
+        project.version_url = "http://www.geany.org/Down"
+        self.session.add(project)
+        self.session.commit()
+
         data = {'id': 1}
-        output = self.app.post('/api/version/', data=data)
-        self.assertEqual(output.status_code, 200)
+        output = self.app.post('/api/version/get', data=data)
+        self.assertEqual(output.status_code, 400)
         data = json.loads(output.data)
 
         exp = {
-            "Fedora": [
-                {
-                    "latest_version": "1.23.1",
-                    "name": "geany",
-                    "package_name": "geany",
-                    "raw_regex": "DEFAULT",
-                    "raw_url": "http://www.geany.org/Download/Releases",
-                    "regex":
-                        "(?i)\\bgeany[-_](?:(?:src|source)[-_])?"
-                        "([^-/_\\s]*?\\d[^-/_\\s]*?)(?:[-_.]"
-                        "(?:src|source|orig))?\\.(?:[jt]ar|t[bglx]z|tbz2|zip)"
-                        "\\b",
-                    "url": "http://www.geany.org/Download/Releases",
-                    "versions": [
-                        "1.23.1",
-                        "1.23.1",
-                        "1.23.1",
-                        "1.23.1",
-                        "1.23.1",
-                        "1.23.1"
-                    ]
-                }
-            ]
+            "error": [
+                "geany: no upstream version found. "
+                "- http://www.geany.org/Down - "
+                " " + REGEX % ({'name': 'geany'})
+            ],
+            "output": "notok"
         }
+
+        # This test will break for every update of geany, so we need to
+        # keep the output easy on hand.
+        #print output.data
+        self.assertEqual(data, exp)
+
+        # Modify it back:
+        project.version_url = "http://www.geany.org/Download/Releases"
+        self.session.add(project)
+        self.session.commit()
+
+        data = {'id': 1}
+        output = self.app.post('/api/version/get', data=data)
+        self.assertEqual(output.status_code, 200)
+        data = json.loads(output.data)
+        del(data['created_on'])
+        del(data['updated_on'])
+
+        exp = {
+            "id": 1,
+            "backend": "custom",
+            "homepage": "http://www.geany.org/",
+            "name": "geany",
+            "regex": "DEFAULT",
+            "version": "1.24.1",
+            "version_url": "http://www.geany.org/Download/Releases",
+            "versions": ["1.24.1"],
+            "packages": [
+                {
+                  "distro": "Fedora",
+                  "package_name": "geany"
+                }
+            ],
+        }
+
         # This test will break for every update of geany, so we need to
         # keep the output easy on hand.
         #print output.data
@@ -253,10 +331,23 @@ class CnucnuWebAPItests(Modeltests):
         del(data['updated_on'])
 
         exp = {
+            "id": 1,
+            "backend": "custom",
             "homepage": "http://www.geany.org/",
             "name": "geany",
+            "regex": 'DEFAULT',
+            "version": None,
+            "version_url": 'http://www.geany.org/Download/Releases',
+            "versions": [],
+            "packages": [
+                {
+                  "distro": "Fedora",
+                  "package_name": "geany"
+                }
+            ],
         }
-        self.assertEqual(data, exp)
+
+        self.assertEqual(exp, data)
 
     def test_api_get_project_distro(self):
         """ Test the api_get_project_distro function of the API. """
@@ -293,12 +384,25 @@ class CnucnuWebAPItests(Modeltests):
         del(data['updated_on'])
 
         exp = {
+            "id": 1,
+            "backend": "custom",
             "homepage": "http://www.geany.org/",
             "name": "geany",
+            "regex": 'DEFAULT',
+            "version": None,
+            "version_url": 'http://www.geany.org/Download/Releases',
+            "versions": [],
+            "packages": [
+                {
+                  "distro": "Fedora",
+                  "package_name": "geany"
+                }
+            ],
         }
+
         self.assertEqual(data, exp)
 
 
 if __name__ == '__main__':
-    SUITE = unittest.TestLoader().loadTestsFromTestCase(CnucnuWebAPItests)
+    SUITE = unittest.TestLoader().loadTestsFromTestCase(AnityaWebAPItests)
     unittest.TextTestRunner(verbosity=2).run(SUITE)

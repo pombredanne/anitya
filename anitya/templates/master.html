@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Monitoring project releases" />
+    <meta name="author" content="Pierre-Yves Chibon" />
+
+    <link rel="shortcut icon" href="{{ url_for('static', filename='ico/favicon.ico') }}">
+
+    <title>Anitya</title>
+
+    <link href="{{ url_for('static', filename='bootstrap/css/bootstrap.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/text.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/navbar.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/footer.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/cnucnu.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='bootstrap-datetimepicker.min.css') }}" rel="stylesheet" />
+
+    {% block header %}{% endblock %}
+
+  </head>
+
+  <body
+    prefix="doap: http://usefulinc.com/ns/doap#"
+  >
+    <div id="wrap" class="container{{ ' max-width' if current == 'index' }}">
+
+      <!-- Static navbar -->
+      <div class="navbar navbar-default navbar-fixed-top">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse"
+                data-target=".navbar-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="{{url_for('index')}}">
+            release-monitoring.org</a>
+        </div>
+
+        <div class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+              {% if 'about' == current %}
+              <li class="active">
+              {% else %}
+              <li>
+              {% endif %}
+                <a href="{{url_for('about')}}">about</a>
+              <li>
+              {% if 'fedmsg' == current %}
+              <li class="active">
+              {% else %}
+              <li>
+              {% endif %}
+                <a href="{{url_for('fedmsg')}}">fedmsg</a>
+              <li>
+
+            {% if current == 'projects' %}
+            <li class="active">
+            {% else %}
+            <li>
+            {% endif %}
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                  projects
+              </a>
+              <ul class="dropdown-menu">
+                  <li>
+                      <a href="{{url_for('projects')}}">All</a>
+                  </li>
+                  <li class="divider"></li>
+                  <li>
+                    <a href="{{url_for('projects_updated')}}">Updated</a>
+                  </li>
+                  <li>
+                    <a href="{{url_for('projects_updated', status='new')}}">
+                      Not updated
+                    </a>
+                  </li>
+                  <li>
+                    <a href="{{url_for('projects_updated', status='failed')}}">
+                      Failed to update
+                    </a>
+                  </li>
+                  <li>
+                    <a href="{{url_for('projects_updated', status='never_updated')}}">
+                      Never updated
+                    </a>
+                  </li>
+                </ul>
+            </li>
+
+            {% if current == 'distros' %}
+            <li class="active">
+            {% else %}
+            <li>
+            {% endif %}
+              <a href="{{url_for('distros')}}">
+                  distros
+              </a>
+            </li>
+
+            {% if g.auth.logged_in %}
+            {% if current == 'Add projects' %}
+            <li class="active">
+            {% else %}
+            <li>
+            {% endif %}
+              <a href="{{url_for('new_project')}}">
+                  add project
+              </a>
+            </li>
+
+            {% if is_admin %}
+            {% if current == 'logs' %}
+            <li class="active">
+            {% else %}
+            <li>
+            {% endif %}
+              <a href="{{url_for('browse_logs')}}">
+                  logs
+              </a>
+            </li>
+            {% endif %}
+
+            <li>
+              <a href="{{url_for('logout')}}?next={{request.url}}">logout</a>
+            </li>
+            {% else %}
+            <li>
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                    <b class="caret"></b> login
+                </a>
+                <ul class="dropdown-menu">
+                  {% if config['ANITYA_WEB_FEDORA_OPENID'] and
+                        config['ANITYA_WEB_ALLOW_FAS_OPENID'] %}
+                  <li><a href="{{url_for('fedora_login')}}">Fedora</a></li>
+                  <li class="divider"></li>
+                  {% endif %}
+                  {% if config['ANITYA_WEB_ALLOW_GOOGLE_OPENID'] %}
+                  <li><a href="{{url_for('google_login')}}">Google</a></li>
+                  {% endif %}
+                  {% if config['ANITYA_WEB_ALLOW_YAHOO_OPENID'] %}
+                  <li><a href="{{url_for('yahoo_login')}}">Yahoo</a></li>
+                  {% endif %}
+                  {% if config['ANITYA_WEB_ALLOW_GENERIC_OPENID'] %}
+                  <li><a href="{{url_for('login')}}">Other OpenID</a></li>
+                  {% endif %}
+                </ul>
+            </li>
+            {% endif %}
+
+          </ul>
+
+        </div><!--/.nav-collapse -->
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if category, messages %}
+        <ul id="flashes">
+            {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+      {% endwith %}
+
+      {% block body %}{% endblock %}
+
+    </div> <!-- /container -->
+
+    <div id="footer">
+      <div class="container">
+        <p class="text-muted credit">
+        Anitya ({{ version }}):
+        <a href="https://github.com/fedora-infra/anitya">sources</a>
+        --
+        <a href="https://github.com/fedora-infra/anitya/issues">issue tracker</a>
+        .
+        ©2013-2014 Red Hat, Inc., <a href="http://pingoured.fr">pingou</a>.
+        </p>
+      </div>
+    </div>
+
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script type="text/javascript"
+        src="{{ url_for('static', filename='js/jquery-1.10.2.min.js')}}"></script>
+    <script type="text/javascript"
+        src="{{ url_for('static', filename='js/bootstrap.min.js') }}">
+    </script>
+    <script type="text/javascript"
+        src="{{ url_for('static', filename='js/moment.js') }}">
+    </script>
+    <script type="text/javascript"
+        src="{{ url_for('static', filename='bootstrap-datetimepicker.js') }}">
+    </script>
+    {% block jscript %}{% endblock %}
+  </body>
+</html>
