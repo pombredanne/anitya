@@ -28,6 +28,23 @@ BASE = declarative_base()
 log = logging.getLogger(__name__)
 
 
+def _paginate_query(query, page):
+    ''' Paginate a given query to returned the specified page (if any).
+    '''
+    if page:
+        try:
+            page = int(page)
+        except ValueError:
+            page = None
+
+    if page:
+        limit = 50
+        offset = (page - 1) * limit
+        query = query.offset(offset).limit(limit)
+
+    return query
+
+
 class Log(BASE):
     ''' Simple table to store/log action occuring in the database. '''
     __tablename__ = 'logs'
@@ -160,16 +177,7 @@ class Distro(BASE):
     def all(cls, session, page=None, count=False):
         query = session.query(cls).order_by(cls.name)
 
-        if page:
-            try:
-                page = int(page)
-            except ValueError:
-                page = None
-
-        if page:
-            limit = page * 50
-            offset = (page - 1) * 50
-            query = query.offset(offset).limit(limit)
+        query = _paginate_query(query, page)
 
         if count:
             return query.count()
@@ -193,16 +201,7 @@ class Distro(BASE):
             cls.name
         ).distinct()
 
-        if page:
-            try:
-                page = int(page)
-            except ValueError:
-                page = None
-
-        if page:
-            limit = page * 50
-            offset = (page - 1) * 50
-            query = query.offset(offset).limit(limit)
+        query = _paginate_query(query, page)
 
         if count:
             return query.count()
@@ -303,6 +302,7 @@ class Project(BASE):
     )
     version_url = sa.Column(sa.String(200), nullable=True)
     regex = sa.Column(sa.String(200), nullable=True)
+    insecure = sa.Column(sa.Boolean, nullable=False, default=False)
 
     latest_version = sa.Column(sa.String(50))
     logs = sa.Column(sa.Text)
@@ -391,16 +391,7 @@ class Project(BASE):
             sa.func.lower(Project.name)
         )
 
-        if page:
-            try:
-                page = int(page)
-            except ValueError:
-                page = None
-
-        if page:
-            limit = page * 50
-            offset = (page - 1) * 50
-            query = query.offset(offset).limit(limit)
+        query = _paginate_query(query, page)
 
         if count:
             return query.count()
@@ -419,16 +410,7 @@ class Project(BASE):
             sa.func.lower(Project.name)
         )
 
-        if page:
-            try:
-                page = int(page)
-            except ValueError:
-                page = None
-
-        if page:
-            limit = page * 50
-            offset = (page - 1) * 50
-            query = query.offset(offset).limit(limit)
+        query = _paginate_query(query, page)
 
         if count:
             return query.count()
@@ -501,16 +483,7 @@ class Project(BASE):
                 Project.logs.ilike(log),
             )
 
-        if page:
-            try:
-                page = int(page)
-            except ValueError:
-                page = None
-
-        if page:
-            limit = page * 50
-            offset = (page - 1) * 50
-            query = query.offset(offset).limit(limit)
+        query = _paginate_query(query, page)
 
         if count:
             return query.count()
@@ -521,22 +494,37 @@ class Project(BASE):
     def search(cls, session, pattern, distro=None, page=None, count=False):
         ''' Search the projects by their name or package name '''
 
+        pattern = pattern.replace('_', '\_')
         if '*' in pattern:
             pattern = pattern.replace('*', '%')
 
         query1 = session.query(
             cls
-        ).filter(
-            Project.name.ilike(pattern)
         )
+
+        if '%' in pattern:
+            query1 = query1.filter(
+                Project.name.ilike(pattern)
+            )
+        else:
+            query1 = query1.filter(
+                Project.name == pattern
+            )
 
         query2 = session.query(
             cls
         ).filter(
             Project.id == Packages.project_id
-        ).filter(
-            Packages.package_name.ilike(pattern)
         )
+
+        if '%' in pattern:
+            query2 = query2.filter(
+                Packages.package_name.ilike(pattern)
+            )
+        else:
+            query2 = query2.filter(
+                Packages.package_name == pattern
+            )
 
         if distro is not None:
             query1 = query1.filter(
@@ -555,16 +543,7 @@ class Project(BASE):
             cls.name
         )
 
-        if page:
-            try:
-                page = int(page)
-            except ValueError:
-                page = None
-
-        if page:
-            limit = page * 50
-            offset = (page - 1) * 50
-            query = query.offset(offset).limit(limit)
+        query = _paginate_query(query, page)
 
         if count:
             return query.count()

@@ -12,6 +12,20 @@ import anitya.lib.model
 from anitya.app import APP, SESSION, login_required, load_docs
 
 
+def get_extended_pattern(pattern):
+    ''' For a given pattern `p` return it so that it looks like `*p*`
+    adjusting it accordingly.
+    '''
+
+    if not pattern.startswith('*') and not pattern.endswith('*'):
+        pattern += '*'
+    elif not pattern.startswith('*') and pattern.endswith('*'):
+        pattern = '*' + pattern
+    elif pattern.startswith('*') and not pattern.endswith('*'):
+        pattern += '*'
+    return pattern
+
+
 @APP.route('/')
 def index():
     total = anitya.lib.model.Project.all(SESSION, count=True)
@@ -40,8 +54,8 @@ def fedmsg():
     )
 
 
-@APP.route('/project/<project_id>')
-@APP.route('/project/<project_id>/')
+@APP.route('/project/<int:project_id>')
+@APP.route('/project/<int:project_id>/')
 def project(project_id):
 
     project = anitya.lib.model.Project.by_id(SESSION, project_id)
@@ -54,6 +68,37 @@ def project(project_id):
         current='project',
         project=project,
     )
+
+
+@APP.route('/project/<project_name>')
+@APP.route('/project/<project_name>/')
+def project_name(project_name):
+
+    page = flask.request.args.get('page', 1)
+
+    try:
+        page = int(page)
+    except ValueError:
+        page = 1
+
+    projects = anitya.lib.model.Project.search(
+        SESSION, pattern=project_name, page=page)
+    projects_count = anitya.lib.model.Project.search(
+        SESSION, pattern=project_name, count=True)
+
+    if projects_count == 1:
+        return project(projects[0].id)
+
+    total_page = int(ceil(projects_count / float(50)))
+
+    return flask.render_template(
+        'search.html',
+        current='projects',
+        pattern=project_name,
+        projects=projects,
+        total_page=total_page,
+        projects_count=projects_count,
+        page=page)
 
 
 @APP.route('/projects')
@@ -121,7 +166,10 @@ def projects_updated(status='updated'):
         total_page=total_page,
         projects_count=projects_count,
         page=page,
-        status=status)
+        status=status,
+        name=name,
+        log=log,
+    )
 
 
 @APP.route('/distros')
@@ -184,9 +232,7 @@ def projects_search(pattern=None):
 
     pattern = flask.request.args.get('pattern', pattern) or '*'
     page = flask.request.args.get('page', 1)
-
-    if '*' not in pattern:
-        pattern += '*'
+    exact = flask.request.args.get('exact', 0)
 
     try:
         page = int(page)
@@ -195,8 +241,20 @@ def projects_search(pattern=None):
 
     projects = anitya.lib.model.Project.search(
         SESSION, pattern=pattern, page=page)
-    projects_count = anitya.lib.model.Project.search(
-        SESSION, pattern=pattern, count=True)
+
+    if not str(exact).lower() in ['1', 'true']:
+        # Extends the search
+        for proj in anitya.lib.model.Project.search(
+                SESSION,
+                pattern=get_extended_pattern(pattern),
+                page=page):
+            if proj not in projects:
+                projects.append(proj)
+        projects_count = anitya.lib.model.Project.search(
+            SESSION, pattern=get_extended_pattern(pattern), count=True)
+    else:
+        projects_count = anitya.lib.model.Project.search(
+            SESSION, pattern=pattern, distro=distroname, count=True)
 
     if projects_count == 1 and projects[0].name == pattern.replace('*', ''):
         flask.flash(
@@ -223,9 +281,7 @@ def distro_projects_search(distroname, pattern=None):
 
     pattern = flask.request.args.get('pattern', pattern) or '*'
     page = flask.request.args.get('page', 1)
-
-    if '*' not in pattern:
-        pattern += '*'
+    exact = flask.request.args.get('exact', 0)
 
     try:
         page = int(page)
@@ -234,8 +290,23 @@ def distro_projects_search(distroname, pattern=None):
 
     projects = anitya.lib.model.Project.search(
         SESSION, pattern=pattern, distro=distroname, page=page)
-    projects_count = anitya.lib.model.Project.search(
-        SESSION, pattern=pattern, distro=distroname, count=True)
+
+    if not str(exact).lower() in ['1', 'true']:
+        # Extends the search
+        for proj in anitya.lib.model.Project.search(
+                SESSION,
+                pattern=get_extended_pattern(pattern),
+                distro=distroname,
+                page=page):
+            if proj not in projects:
+                projects.append(proj)
+        projects_count = anitya.lib.model.Project.search(
+            SESSION,
+            pattern=get_extended_pattern(pattern),
+            distro=distroname, count=True)
+    else:
+        projects_count = anitya.lib.model.Project.search(
+            SESSION, pattern=pattern, distro=distroname, count=True)
 
     if projects_count == 1 and projects[0].name == pattern.replace('*', ''):
         flask.flash(
@@ -341,9 +412,11 @@ def edit_project(project_id):
                 backend=form.backend.data.strip(),
                 version_url=form.version_url.data.strip(),
                 regex=form.regex.data.strip(),
+                insecure=form.insecure.data,
                 user_mail=flask.g.auth.email,
             )
             flask.flash('Project edited')
+            flask.session['justedit'] = True
         except anitya.lib.exceptions.AnityaException as err:
             flask.flash(str(err), 'errors')
 
@@ -386,7 +459,10 @@ def map_project(project_id):
             )
             SESSION.commit()
             flask.flash('Mapping added')
-        except anitya.lib.exceptions.AnityaException as err:
+        except anitya.lib.exceptions.AnityaInvalidMappingException as err:
+            err.link = flask.url_for('project', project_id=err.project_id)
+            flask.flash(err.message, 'error')
+        except  anitya.lib.exceptions.AnityaException as err:
             flask.flash(str(err), 'error')
 
         return flask.redirect(
@@ -430,7 +506,10 @@ def edit_project_mapping(project_id, pkg_id):
 
             SESSION.commit()
             flask.flash('Mapping edited')
-        except anitya.lib.exceptions.AnityaException as err:
+        except anitya.lib.exceptions.AnityaInvalidMappingException as err:
+            err.link = flask.url_for('project', project_id=err.project_id)
+            flask.flash(err.message, 'error')
+        except  anitya.lib.exceptions.AnityaException as err:
             flask.flash(str(err), 'error')
 
         return flask.redirect(

@@ -114,7 +114,7 @@ def create_project(
 
 def edit_project(
         session, project, name, homepage, backend, version_url, regex,
-        user_mail):
+        insecure, user_mail):
     """ Edit a project in the database.
 
     """
@@ -141,6 +141,10 @@ def edit_project(
         project.regex = regex.strip() if regex else None
         if old != project.regex:
             changes['regex'] = {'old': old, 'new': project.regex}
+    if insecure != project.insecure:
+        old = project.insecure
+        project.insecure = insecure
+        changes['insecure'] = {'old': old, 'new': project.insecure}
 
     try:
         if changes:
@@ -206,10 +210,9 @@ def map_project(
     other_pkg = anitya.lib.model.Packages.by_package_name_distro(
         session, package_name, distro)
     if other_pkg:
-        raise anitya.lib.exceptions.AnityaException(
-            'Could not edit the mapping of %s on %s, there is already '
-            'a package %s on %s.' % (
-                pkgname, distro, package_name, distribution))
+        raise anitya.lib.exceptions.AnityaInvalidMappingException(
+                pkgname, distro, package_name, distribution,
+                other_pkg.project.id, other_pkg.project.name)
 
     edited = None
     if not pkg:

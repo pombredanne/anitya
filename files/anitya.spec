@@ -2,7 +2,7 @@
 %distutils.sysconfig import get_python_lib; print (get_python_lib())")}
 
 Name:           anitya
-Version:        0.1.15
+Version:        0.4.0
 Release:        1%{?dist}
 Summary:        Monitor upstream releases and announce them on fedmsg
 
@@ -35,6 +35,7 @@ BuildRequires:  python-sqlalchemy > 0.7
 Requires:  python-sqlalchemy > 0.7
 %endif
 
+Requires:  python-alembic
 Requires:  python-flask
 Requires:  python-flask-wtf
 Requires:  python-flask-openid
@@ -88,8 +89,8 @@ install -m 644 files/migrate_wiki.py $RPM_BUILD_ROOT/%{_datadir}/anitya/anitya_m
 install -m 755 files/anitya_cron.py $RPM_BUILD_ROOT/%{_datadir}/anitya/anitya_cron.py
 
 # Install the alembic files
-#cp -r alembic $RPM_BUILD_ROOT/%{_datadir}/anitya/
-#install -m 644 files/alembic.ini $RPM_BUILD_ROOT/%{_sysconfdir}/anitya/alembic.ini
+cp -r alembic $RPM_BUILD_ROOT/%{_datadir}/anitya/
+install -m 644 files/alembic.ini $RPM_BUILD_ROOT/%{_sysconfdir}/anitya/alembic.ini
 
 ## Running the tests would require having flask >= 0.10 which is not present in
 ## epel6
@@ -100,7 +101,7 @@ install -m 755 files/anitya_cron.py $RPM_BUILD_ROOT/%{_datadir}/anitya/anitya_cr
 %doc README.rst LICENSE
 %config(noreplace) %{_sysconfdir}/httpd/conf.d/anitya.conf
 %config(noreplace) %{_sysconfdir}/anitya/anitya.cfg
-#config(noreplace) %{_sysconfdir}/anitya/alembic.ini
+%config(noreplace) %{_sysconfdir}/anitya/alembic.ini
 %dir %{_sysconfdir}/anitya/
 %{_datadir}/anitya/
 %{python_sitelib}/anitya/
@@ -109,6 +110,58 @@ install -m 755 files/anitya_cron.py $RPM_BUILD_ROOT/%{_datadir}/anitya/anitya_cr
 
 
 %changelog
+* Sun Apr 05 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.4.0-1
+- Fix the search to uniquify the results
+- Prevent the keyboard shortcuts to work is the control key was hold
+- Sort versions consistently (Ralph Bean)
+- Fix GitHub capitalization (Piotr Popieluch)
+- Fix the pagination when browsing the list of projects (limit was wrongly set)
+
+* Tue Mar 31 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.3.0-2
+- Fix changelog of version 0.3.0-1
+- Include and install the alembic files
+
+* Tue Mar 31 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.3.0-1
+- Converted Google project name to lower case in their URL (Aayush Kasurde)
+- Fix the casing of GitHub (Aayush Kasurde)
+- Allow projects to make insecure http calls
+- Update the GNOME backend to rely on the cache.json if present
+- Include in the fedmsg message if the new version found is odd or not
+- Strip leading v from versions before we compare them (Ralph Bean)
+- Update instructions in the README (Shagufta)
+- Only place the name in the regex if it is asked for
+- When searching show first the results of exact match search then the
+  results of a broader search
+
+* Thu Feb 26 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.2.0
+- Fix doc typos (reported by tibbs, fixed by Ralph Bean)
+- Fix typo when unable to retrieve the latest version (Thomas Spura)
+- Autocomplete distribution name when mapping a project
+- Dynamically check existing projects while adding a new one
+- Check now button available after an edit
+- More information for the custom backend
+- Fix the drupal backends to make them suppor project named 'drupal6: foo'
+  or 'drupal7: bar'
+- Fix pagination on quite some pages
+- Allow users to browse their own log
+- On postgresql '_' is a special character that we should escape
+- User friendly url for example: /project/guake
+- More info when mapping a project fails (including a link to the project
+  causing the failure to map)
+
+* Tue Feb 10 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.1.17-1
+- Update to 0.1.17
+- Bring back from cnucnu support for URLs including '*', ie:
+  http://download.tuxfamily.org/xmoto/xmoto/*/ where anitya will go down the
+  folder structure to find the latest version
+
+* Thu Jan 29 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.1.16-1
+- Update to 0.1.16
+- In the documentation (about page) adjust the code to store the url in a
+  variable making it easier for people to copy/paste the code (Elan Ruusamäe)
+- Add api to query for a project by homepage. (Ralph Bean)
+- Typofix in the API docs generation. (Ralph Bean)
+
 * Thu Dec 18 2014 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.1.15-1
 - Fix changelog to include the release in addition to the version
 - Update to 0.1.15

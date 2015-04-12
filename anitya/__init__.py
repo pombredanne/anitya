@@ -3,8 +3,6 @@
 import logging
 import warnings
 
-from pkg_resources import parse_version
-
 import anitya.lib.plugins
 import anitya.lib.exceptions
 
@@ -36,9 +34,8 @@ def order_versions(vlist):
     ''' For a provided list of versions, return the list ordered from the
     oldest to the newest version.
     '''
-    return sorted(
-        vlist,
-        cmp=lambda x, y: cmp(parse_version(x), parse_version(y)))
+    import anitya.lib.backends  # Avoid circular import
+    return sorted(vlist, cmp=anitya.lib.backends.upstream_cmp)
 
 
 def check_release(project, session):
@@ -79,9 +76,11 @@ def check_release(project, session):
             )
         )
 
+    odd_change = False
     if up_version and up_version != p_version:
         max_version = order_versions([up_version, p_version])[-1]
         if project.latest_version and max_version != up_version:
+            odd_change = True
             project.logs = 'Something strange occured, we found that this '\
                 'project has released a version "%s" while we had the latest '\
                 'version at "%s"' % (up_version, project.latest_version)
@@ -100,6 +99,7 @@ def check_release(project, session):
                 packages=[pkg.__json__() for pkg in project.packages],
                 versions=project.versions,
                 agent='anitya',
+                odd_change=odd_change,
             ),
         )
 

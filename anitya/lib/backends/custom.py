@@ -28,6 +28,8 @@ class CustomBackend(BaseBackend):
         'http://subsurface.hohndel.org/downloads/',
         'http://www.geany.org/Download/Releases',
     ]
+    more_info = '<br /> More information in the '\
+        '<a href=\'/about#test-your-regex\'>about#test-your-regex</a>'
 
     @classmethod
     def get_version(cls, project):
@@ -65,6 +67,9 @@ class CustomBackend(BaseBackend):
         regex = REGEX_ALIASES['DEFAULT']
         if project.regex:
             regex = REGEX_ALIASES.get(project.regex, project.regex)
-        regex = regex % {'name': project.name.replace('+', '\+')}
 
-        return get_versions_by_regex(url, regex, project)
+        if '%(name)' in regex:
+            regex = regex % {'name': project.name.replace('+', '\+')}
+
+        return get_versions_by_regex(
+            url, regex, project, insecure=project.insecure)
