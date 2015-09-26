@@ -209,7 +209,7 @@ def map_project(
     # Check that we can update the mapping to the new info provided
     other_pkg = anitya.lib.model.Packages.by_package_name_distro(
         session, package_name, distro)
-    if other_pkg:
+    if other_pkg and other_pkg.project:
         raise anitya.lib.exceptions.AnityaInvalidMappingException(
                 pkgname, distro, package_name, distribution,
                 other_pkg.project.id, other_pkg.project.name)
@@ -217,11 +217,15 @@ def map_project(
     edited = None
     if not pkg:
         topic = 'project.map.new'
-        pkg = anitya.lib.model.Packages(
-            distro=distro_obj.name,
-            project_id=project.id,
-            package_name=package_name
-        )
+        if not other_pkg:
+            pkg = anitya.lib.model.Packages(
+                distro=distro_obj.name,
+                project_id=project.id,
+                package_name=package_name
+            )
+        else:
+            other_pkg.project = project
+            pkg = other_pkg
     else:
         topic = 'project.map.update'
         edited = []
@@ -262,3 +266,72 @@ def map_project(
     )
 
     return pkg
+
+
+def flag_project(session, project, reason, user_mail):
+    """ Flag a project in the database.
+
+    """
+
+    flag = anitya.lib.model.ProjectFlag(
+        user=user_mail,
+        project=project,
+        reason=reason)
+
+    session.add(flag)
+
+    try:
+        session.flush()
+    except SQLAlchemyError as err:
+        log.exception(err)
+        session.rollback()
+        raise anitya.lib.exceptions.AnityaException(
+            'Could not flag this project.')
+
+    anitya.log(
+        session,
+        project=project,
+        topic='project.flag',
+        message=dict(
+            agent=user_mail,
+            project=project.name,
+            reason=reason,
+        )
+    )
+    session.commit()
+    return flag
+
+
+def set_flag_state(session, flag, state, user_mail):
+    """ Change the state of a ProjectFlag in the database.
+
+    """
+
+    # Don't toggle the state or send a new fedmsg if the flag's
+    # state wouldn't actually be changed.
+    if flag.state == state:
+        raise anitya.lib.exceptions.AnityaException(
+            'Flag state unchanged.')
+
+    flag.state = state
+    session.add(flag)
+
+    try:
+        session.flush()
+    except SQLAlchemyError as err:
+        log.exception(err)
+        session.rollback()
+        raise anitya.lib.exceptions.AnityaException(
+            'Could not set the state of this flag.')
+
+    anitya.log(
+        session,
+        topic='project.flag.set',
+        message=dict(
+            agent=user_mail,
+            flag=flag.id,
+            state=state,
+        )
+    )
+    session.commit()
+    return flag

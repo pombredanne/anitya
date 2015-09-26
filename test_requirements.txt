@@ -1,3 +1,7 @@
 vcrpy
 nose
 coverage
+
+# required by vcs looks like
+mock
+contextlib2

@@ -56,7 +56,7 @@ class RubygemsBackend(BaseBackend):
             when the versions cannot be retrieved correctly
 
         '''
-        url = 'http://rubygems.org/api/v1/gems/%(name)s.json' % {
+        url = 'http://rubygems.org/api/v1/versions/%(name)s/latest.json' % {
             'name': project.name}
 
         try:
@@ -68,5 +68,9 @@ class RubygemsBackend(BaseBackend):
             data = req.json()
         except Exception:  # pragma: no cover
             raise AnityaPluginException('No JSON returned by %s' % url)
+
+        if data['version'] == 'unknown':
+            raise AnityaPluginException(
+                'Project or version unknown at %s' % url)
 
         return [data['version']]

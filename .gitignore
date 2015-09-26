@@ -7,6 +7,12 @@ doc/_build/
 *.wsgi
 *.sqlite
 *~
+*.swp
+*.swo
 start-pkgdb
 .coverage
 cnucnu/
+*.swp
+*.swo
+*.egg
+anitya-env

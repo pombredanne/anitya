@@ -2,7 +2,7 @@
 %distutils.sysconfig import get_python_lib; print (get_python_lib())")}
 
 Name:           anitya
-Version:        0.4.0
+Version:        0.6.3
 Release:        1%{?dist}
 Summary:        Monitor upstream releases and announce them on fedmsg
 
@@ -110,6 +110,45 @@ install -m 644 files/alembic.ini $RPM_BUILD_ROOT/%{_sysconfdir}/anitya/alembic.i
 
 
 %changelog
+* Tue Sep 08 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.6.3-1
+- Update to 0.6.3
+- Fix the stackage backend by not hard-coding the GHC version
+
+* Tue Sep 01 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.6.2-1
+- Update to 0.6.2
+- Add tooltip for 'Flag' and restrict 'Flags' to admins (Ariel O. Barria)
+- Stackage: change regexp to track LTS Haskell (Jens Petersen)
+- Return the actually error message to the UI when retrieving a new version
+- Fix OpenID login for fedora/google/yahoo (Patrick Uiterwijk)
+
+* Mon Jul 06 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.6.1-1
+- Update to 0.6.1
+- Adjust the GitHub backend to work when the user only provided a homepage
+  (pointing to github.com)
+- Make the cron script multi-threaded (makes it go from ~100 minutes to ~15)
+- Fix the flags page to work when the flag does not link to a project (for
+  example when you deleted the project flagged when processing the flag)
+
+* Wed Jun 24 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.6.0-1
+- Update to 0.6.0
+- Update to the latest bootstrap fedora (Ralph Bean)
+- Feature/prettier flash system (David Gay)
+- Fix README (Ralph Bean)
+- Add a system to flag projects to the anitya admins (David Gay)
+- Adjust the rubygems backend to use versions API (Vít Ondruch)
+- Fix the unit-tests suite
+- Add a haskell Stackage backend (Jens Petersen)
+- Add a pagure backend
+
+* Tue May 05 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.5.0-1
+- Update to 0.5.0
+- Adjust the default regex to ignore .asc in filename
+- Adjust php backends and fix unit-tests
+- Fix link to the regex documentation
+- Use vcr to mock out all http stuff in the tests (Ralph Bean)
+- Fix mapping of a project on an existing package
+- Invert the project name and SF name in the SourceForge backend.
+
 * Sun Apr 05 2015 Pierre-Yves Chibon <pingou@pingoured.fr> - 0.4.0-1
 - Fix the search to uniquify the results
 - Prevent the keyboard shortcuts to work is the control key was hold

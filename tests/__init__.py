@@ -41,7 +41,7 @@ import anitya.lib.model as model
 #DB_PATH = 'sqlite:///:memory:'
 ## A file database is required to check the integrity, don't ask
 DB_PATH = 'sqlite:////tmp/anitya_test.sqlite'
-FAITOUT_URL = 'http://209.132.184.152/faitout/'
+FAITOUT_URL = 'http://faitout.fedorainfracloud.org/'
 
 if os.environ.get('BUILD_ID'):
     try:
@@ -64,8 +64,11 @@ def skip_jenkins(function):
     @wraps(function)
     def decorated_function(*args, **kwargs):
         """ Decorated function, actually does the work. """
-        if os.environ.get('BUILD_ID'):
-            raise unittest.SkipTest('Skip backend test on jenkins')
+        ## We used to skip all these tests in jenkins, but now with vcrpy, we
+        ## don't need to.  We can replay the recorded request/response pairs
+        ## for each test from disk.
+        #if os.environ.get('BUILD_ID'):
+        #    raise unittest.SkipTest('Skip backend test on jenkins')
         return function(*args, **kwargs)
 
     return decorated_function
@@ -73,6 +76,7 @@ def skip_jenkins(function):
 
 class Modeltests(unittest.TestCase):
     """ Model tests. """
+    maxDiff = None
 
     def __init__(self, method_name='runTest'):
         """ Constructor. """
@@ -174,6 +178,31 @@ def create_package(session):
     session.add(package)
 
     session.commit()
+
+
+def create_flagged_project(session):
+    """ Create and flag a project. Returns the ProjectFlag. """
+    project = anitya.lib.create_project(
+        session,
+        name='geany',
+        homepage='http://www.geany.org/',
+        version_url='http://www.geany.org/Download/Releases',
+        regex='DEFAULT',
+        user_mail='noreply@fedoraproject.org',
+    )
+
+    session.add(project)
+
+    flag = anitya.lib.flag_project(
+        session,
+        project,
+        "This is a duplicate.",
+        "dgay@redhat.com")
+
+    session.add(flag)
+
+    session.commit()
+    return flag
 
 
 if __name__ == '__main__':

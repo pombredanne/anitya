@@ -29,7 +29,7 @@ import anitya.lib.plugins
 import anitya.mail_logging
 
 
-__version__ = '0.4.0'
+__version__ = '0.6.3'
 
 # Create the application.
 APP = flask.Flask(__name__)
@@ -75,11 +75,23 @@ def format_examples(examples):
     return output
 
 
+@APP.template_filter('context_class')
+def context_class(category):
+    ''' Return bootstrap context class for a given category. '''
+    values = {
+        'message': 'default',
+        'error': 'danger',
+        'info': 'info',
+    }
+    return values.get(category, 'warning')
+
+
 @APP.before_request
 def check_auth():
     ''' Set the flask.g variables using the session information if the user
     is logged in.
     '''
+
     flask.g.auth = Bunch(
         logged_in=False,
         method=None,
@@ -180,8 +192,8 @@ def login():
         next=OID.get_next_url(), error=OID.fetch_error())
 
 
-@APP.route('/login/fedora/')
-@APP.route('/login/fedora')
+@APP.route('/login/fedora/', methods=('GET', 'POST'))
+@APP.route('/login/fedora', methods=('GET', 'POST'))
 @OID.loginhandler
 def fedora_login():
     ''' Handles login against the Fedora OpenID server. '''
@@ -202,8 +214,8 @@ def fedora_login():
         ask_for_optional=['fullname'])
 
 
-@APP.route('/login/google/')
-@APP.route('/login/google')
+@APP.route('/login/google/', methods=('GET', 'POST'))
+@APP.route('/login/google', methods=('GET', 'POST'))
 @OID.loginhandler
 def google_login():
     ''' Handles login via the Google OpenID. '''
@@ -223,8 +235,8 @@ def google_login():
         ask_for=['email', 'fullname'])
 
 
-@APP.route('/login/yahoo/')
-@APP.route('/login/yahoo')
+@APP.route('/login/yahoo/', methods=('GET', 'POST'))
+@APP.route('/login/yahoo', methods=('GET', 'POST'))
 @OID.loginhandler
 def yahoo_login():
     ''' Handles login via the Yahoo OpenID. '''
