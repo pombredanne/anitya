@@ -39,7 +39,8 @@
             <span class="icon-bar"></span>
           </button>
           <a class="navbar-brand" href="{{url_for('index')}}">
-            release-monitoring.org</a>
+            release-monitoring.org
+          </a>
         </div>
 
         <div class="navbar-collapse collapse">
@@ -74,6 +75,11 @@
                   <li class="divider"></li>
                   <li>
                     <a href="{{url_for('projects_updated')}}">Updated</a>
+                  </li>
+                  <li>
+                    <a href="{{url_for('projects_updated', status='odd')}}">
+                      Odd version found
+                    </a>
                   </li>
                   <li>
                     <a href="{{url_for('projects_updated', status='new')}}">
@@ -159,6 +165,14 @@
                 </ul>
             </li>
             {%- endif -%}
+            <li>
+              <form action="{{ url_for('projects_search') }}" role="form" class="form-inline">
+                <div class="form-group">
+                  <input id="searchbox" class="form-control input-sm" type="text" name="pattern" placeholder="Project name"/>
+                  <button type="submit" class="btn btn-sm btn-default">Search</button>
+                </div><!-- /.form-group -->
+              </form>
+            </li>
 
           </ul>
 
@@ -196,6 +210,10 @@
         <a href="https://github.com/fedora-infra/anitya/issues">issue tracker</a>
         .
         ©2013-2014 Red Hat, Inc., <a href="http://pingoured.fr">pingou</a>.
+        {% if cron_status %}
+        Last check {{ cron_status.status }} at {{
+            cron_status.created_on.strftime('%Y-%m-%d %H:%M:%S') }}
+        {% endif %}
         </p>
       </div>
     </div>
@@ -214,6 +232,25 @@
     <script type="text/javascript"
         src="{{ url_for('static', filename='bootstrap-datetimepicker.js') }}">
     </script>
+    <script type="text/javascript">
+      $(function() {
+        $('#searchbox').autocomplete({
+          source: function( request, response ) {
+            $.getJSON(
+              "{{ url_for('api_projects_names') }}", {
+                pattern: request.term + '*'
+              },
+              function( data ) {
+                response( data.projects );
+              }
+            );
+          },
+          minLength: 3,
+          delay: 600,
+        });
+      });
+    </script>
     {% block jscript %}{% endblock %}
   </body>
 </html>
+

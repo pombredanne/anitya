@@ -40,12 +40,12 @@
     <form action="{{ url_for('distro_projects_search', distroname=distroname)
      }}" role="form">
     {% else %}
-    <form action="{{ url_for('projects_search') }}" role="form">
+    <form action="{{ url_for('projects_search') }}" role="form" class="form-inline">
     {% endif %}
       <div class="form-group">
         <input type="text" name="pattern" placeholder="Project name"
-            class="SearchBox" value="{{ pattern }}"/>
-        <button type="submit" class="btn btn-default">Search</button>
+            class="form-control input-sm" value="{{ pattern }}"/>
+        <button type="submit" class="btn btn-sm btn-default">Search</button>
       </div>
     </form>
   </div>
@@ -72,6 +72,11 @@
                     {{ project.homepage }}
                   </a>
                 </td>
+                <td>
+                  {% if project.latest_version %}
+                    {{ project.latest_version }}
+                  {% endif %}
+                </td>
               </tr>
             {% endfor %}
             </table>
@@ -83,6 +88,7 @@
     <blockquote>
         Oups this is embarrassing, it seems that no projects are being
         monitored currently.
+        <p><a href="{{ url_for('new_project', name=pattern) }}">Click Here</a> to add this project instead. </p>
     </blockquote>
     {% endif %}
     </div>

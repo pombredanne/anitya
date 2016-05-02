@@ -302,6 +302,7 @@ class Project(BASE):
     )
     version_url = sa.Column(sa.String(200), nullable=True)
     regex = sa.Column(sa.String(200), nullable=True)
+    version_prefix = sa.Column(sa.String(200), nullable=True)
     insecure = sa.Column(sa.Boolean, nullable=False, default=False)
 
     latest_version = sa.Column(sa.String(50))
@@ -451,7 +452,15 @@ class Project(BASE):
             query = query.filter(
                 Project.logs != None,
                 Project.logs != 'Version retrieved correctly',
+                ~Project.logs.ilike('Something strange occured%'),
             )
+        elif status == 'odd':
+            query = query.filter(
+                Project.logs != None,
+                Project.logs != 'Version retrieved correctly',
+                Project.logs.ilike('Something strange occured%'),
+            )
+
         elif status == 'new':
             query = query.filter(
                 Project.logs == None,
@@ -614,7 +623,7 @@ class ProjectFlag(BASE):
         ).order_by(ProjectFlag.created_on)
 
         return query.all()
-    
+
     @classmethod
     def search(cls, session, project_name=None, from_date=None, user=None,
                state=None, limit=None, offset=None, count=False):
@@ -670,4 +679,23 @@ class ProjectFlag(BASE):
             cls
         ).filter(
             cls.id == flag_id)
+        return query.first()
+
+
+class Run(BASE):
+    __tablename__ = 'runs'
+
+    status = sa.Column(sa.String(20), primary_key=True)
+    created_on = sa.Column(
+        sa.DateTime, default=datetime.datetime.utcnow, primary_key=True)
+
+    @classmethod
+    def last_entry(cls, session):
+        ''' Return the last log about the cron run. '''
+
+        query = session.query(
+            cls
+        ).order_by(
+            cls.created_on.desc()
+        )
         return query.first()

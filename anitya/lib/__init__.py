@@ -77,7 +77,7 @@ def init(db_url, alembic_ini=None, debug=False, create=False):
 
 def create_project(
         session, name, homepage, user_mail, backend='custom',
-        version_url=None, regex=None):
+        version_url=None, version_prefix=None, regex=None):
     """ Create the project in the database.
 
     """
@@ -86,7 +86,8 @@ def create_project(
         homepage=homepage,
         backend=backend,
         version_url=version_url,
-        regex=regex
+        regex=regex,
+        version_prefix=version_prefix,
     )
 
     session.add(project)
@@ -113,8 +114,8 @@ def create_project(
 
 
 def edit_project(
-        session, project, name, homepage, backend, version_url, regex,
-        insecure, user_mail):
+        session, project, name, homepage, backend, version_url,
+        version_prefix, regex, insecure, user_mail):
     """ Edit a project in the database.
 
     """
@@ -136,6 +137,12 @@ def edit_project(
         project.version_url = version_url.strip() if version_url else None
         if old != project.version_url:
             changes['version_url'] = {'old': old, 'new': project.version_url}
+    if  version_prefix != project.version_prefix:
+        old = project.version_prefix
+        project.version_prefix = version_prefix.strip() if version_prefix else None
+        if old != project.version_prefix:
+            changes['version_prefix'] = {
+                'old': old, 'new': project.version_prefix}
     if regex != project.regex:
         old = project.regex
         project.regex = regex.strip() if regex else None
@@ -296,6 +303,7 @@ def flag_project(session, project, reason, user_mail):
             agent=user_mail,
             project=project.name,
             reason=reason,
+            packages=[pkg.__json__() for pkg in project.packages],
         )
     )
     session.commit()
@@ -335,3 +343,9 @@ def set_flag_state(session, flag, state, user_mail):
     )
     session.commit()
     return flag
+
+
+def get_last_cron(session):
+    """ Retrieve the last log entry about the cron
+    """
+    return anitya.lib.model.Run.last_entry(session)

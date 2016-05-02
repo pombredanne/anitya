@@ -16,6 +16,7 @@ class ProjectForm(wtf.Form):
         choices=[(item, item) for item in []]
     )
     version_url = TextField('Version URL', [validators.optional()])
+    version_prefix = TextField('Version prefix', [validators.optional()])
     regex = TextField('Regex', [validators.optional()])
     insecure = BooleanField(
         'Use insecure connection', [validators.optional()])
@@ -31,7 +32,7 @@ class ProjectForm(wtf.Form):
         super(ProjectForm, self).__init__(*args, **kwargs)
         if 'backends' in kwargs:
             self.backend.choices = [
-                (backend, backend) for backend in kwargs['backends']
+                (backend, backend) for backend in sorted(kwargs['backends'])
             ]
 
 

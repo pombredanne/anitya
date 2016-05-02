@@ -178,8 +178,8 @@ a backend for the project hosting. More information below.</p>"""
   </blockquote>"""
         self.assertTrue(expected in output.data)
         self.assertTrue(
-            'form action="/distro/Fedora/search/" role="form">'
-            in output.data)
+            'form action="/distro/Fedora/search/" role="form" '
+            'class="form-inline">' in output.data)
         self.assertTrue(
             '<h1>Projects of Fedora monitored</h1>' in output.data)
 
@@ -187,8 +187,8 @@ a backend for the project hosting. More information below.</p>"""
         self.assertEqual(output.status_code, 200)
         self.assertTrue(expected in output.data)
         self.assertTrue(
-            'form action="/distro/Fedora/search/" role="form">'
-            in output.data)
+            'form action="/distro/Fedora/search/" role="form" '
+            'class="form-inline">' in output.data)
         self.assertTrue(
             '<h1>Projects of Fedora monitored</h1>' in output.data)
 
@@ -204,6 +204,7 @@ a backend for the project hosting. More information below.</p>"""
     <blockquote>
         Oups this is embarrassing, it seems that no projects are being
         monitored currently.
+        <p><a href="/project/new?name=gua">Click Here</a> to add this project instead. </p>
     </blockquote>"""
         self.assertTrue(expected in output.data)
         self.assertTrue(

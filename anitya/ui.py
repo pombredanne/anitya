@@ -140,7 +140,7 @@ def projects_updated(status='updated'):
     except ValueError:
         page = 1
 
-    statuses = ['new', 'updated', 'failed', 'never_updated']
+    statuses = ['new', 'updated', 'failed', 'never_updated', 'odd']
 
     if status not in statuses:
         flask.flash(
@@ -333,7 +333,6 @@ def new_project():
 
     plugins = anitya.lib.plugins.load_plugins(SESSION)
     plg_names = [plugin.name for plugin in plugins]
-
     form = anitya.forms.ProjectForm(backends=plg_names)
 
     if flask.request.method == 'GET':
@@ -352,8 +351,9 @@ def new_project():
                 name=form.name.data.strip(),
                 homepage=form.homepage.data.strip(),
                 backend=form.backend.data.strip(),
-                version_url=form.version_url.data.strip(),
-                regex=form.regex.data.strip(),
+                version_url=form.version_url.data.strip() or None,
+                version_prefix=form.version_prefix.data.strip() or None,
+                regex=form.regex.data.strip() or None,
                 user_mail=flask.g.auth.email,
             )
             SESSION.commit()
@@ -411,6 +411,7 @@ def edit_project(project_id):
                 homepage=form.homepage.data.strip(),
                 backend=form.backend.data.strip(),
                 version_url=form.version_url.data.strip(),
+                version_prefix=form.version_prefix.data.strip(),
                 regex=form.regex.data.strip(),
                 insecure=form.insecure.data,
                 user_mail=flask.g.auth.email,
@@ -430,6 +431,7 @@ def edit_project(project_id):
         current='projects',
         form=form,
         project=project,
+        plugins=plugins,
     )
 
 

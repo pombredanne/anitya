@@ -1,36 +1,32 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014 - Copyright Red Hat Inc
+ (c) 2015 - Copyright Vivek Anand
 
  Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
+   Vivek Anand <vivekanand1101@gmail.com>
 
 """
 
-from anitya.lib.backends import BaseBackend, get_versions_by_regex, REGEX
+from anitya.lib.backends import BaseBackend, get_versions_by_regex
+from anitya.lib.exceptions import AnityaPluginException
 
 
-REGEX_ALIASES = {
-    'DEFAULT': REGEX,
-}
+REGEX = b'class="name">([^<]*[^tip])</td'
 
 
-class CustomBackend(BaseBackend):
-    ''' The custom class for project having a special hosting.
+class BitBucketBackend(BaseBackend):
+    ''' The custom class for projects hosted on bitbucket.org
 
     This backend allows to specify a version_url and a regex that will
     be used to retrieve the version information.
     '''
 
-    name = 'custom'
+    name = 'BitBucket'
     examples = [
-        'http://subsurface.hohndel.org/downloads/',
-        'http://www.geany.org/Download/Releases',
+        'https://bitbucket.org/zzzeek/sqlalchemy',
+        'https://bitbucket.org/cherrypy/cherrypy',
     ]
-    more_info = 'More information in the '\
-        '<a href=\'/about#test-your-regex\'>about#test-your-regex</a>'
-    default_regex = REGEX % {'name': '{project name}'}
 
     @classmethod
     def get_version(cls, project):
@@ -63,14 +59,17 @@ class CustomBackend(BaseBackend):
             when the versions cannot be retrieved correctly
 
         '''
-        url = project.version_url
+        if project.version_url:
+            url_template = 'https://bitbucket.org/%(version_url)s/downloads'
+            version_url = project.version_url.replace('https://bitbucket.org/', '')
+            url = url_template % {'version_url': version_url}
+        elif project.homepage.startswith('https://bitbucket.org'):
+            url = project.homepage
+            if url.endswith('/'):
+                url = project.homepage[:1]
+            url += '/downloads'
+        else:
+            raise AnityaPluginException(
+                'Project %s was incorrectly set-up' % project.name)
 
-        regex = REGEX_ALIASES['DEFAULT']
-        if project.regex:
-            regex = REGEX_ALIASES.get(project.regex, project.regex)
-
-        if '%(name)' in regex:
-            regex = regex % {'name': project.name.replace('+', '\+')}
-
-        return get_versions_by_regex(
-            url, regex, project, insecure=project.insecure)
+        return get_versions_by_regex(url, REGEX, project)
