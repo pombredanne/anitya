@@ -22,6 +22,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
 
+import anitya
 import anitya.lib
 import anitya.lib.model
 import anitya.lib.exceptions
@@ -77,14 +78,20 @@ def init(db_url, alembic_ini=None, debug=False, create=False):
 
 def create_project(
         session, name, homepage, user_id, backend='custom',
-        version_url=None, version_prefix=None, regex=None):
+        version_url=None, version_prefix=None, regex=None,
+        check_release=False):
     """ Create the project in the database.
 
     """
+    # Set the ecosystem if there's one associated with the given backend
+    backend_ref = anitya.lib.model.Backend.by_name(session, name=backend)
+    ecosystem_ref = backend_ref.default_ecosystem
+
     project = anitya.lib.model.Project(
         name=name,
         homepage=homepage,
         backend=backend,
+        ecosystem=ecosystem_ref,
         version_url=version_url,
         regex=regex,
         version_prefix=version_prefix,
@@ -110,12 +117,14 @@ def create_project(
         )
     )
     session.commit()
+    if check_release is True:
+        anitya.check_release(project, session)
     return project
 
 
 def edit_project(
         session, project, name, homepage, backend, version_url,
-        version_prefix, regex, insecure, user_id):
+        version_prefix, regex, insecure, user_id, check_release=False):
     """ Edit a project in the database.
 
     """
@@ -162,12 +171,14 @@ def edit_project(
                 message=dict(
                     agent=user_id,
                     project=project.name,
-                    fields=changes.keys(),  # be backward compat
+                    fields=list(changes.keys()),  # be backward compat
                     changes=changes,
                 )
             )
             session.add(project)
             session.commit()
+        if check_release is True:
+            anitya.check_release(project, session)
     except SQLAlchemyError as err:
         log.exception(err)
         session.rollback()
@@ -201,7 +212,7 @@ def map_project(
         session.add(distro_obj)
         try:
             session.flush()
-        except SQLAlchemyError, err:  # pragma: no cover
+        except SQLAlchemyError as err:  # pragma: no cover
             # We cannot test this situation
             session.rollback()
             raise anitya.lib.exceptions.AnityaException(

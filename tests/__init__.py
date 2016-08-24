@@ -23,6 +23,7 @@
 Anitya tests.
 '''
 
+from __future__ import print_function
 import logging
 import unittest
 import sys
@@ -49,7 +50,7 @@ if os.environ.get('BUILD_ID'):
         req = requests.get('%s/new' % FAITOUT_URL)
         if req.status_code == 200:
             DB_PATH = req.text
-            print 'Using faitout at: %s' % DB_PATH
+            print('Using faitout at: %s' % DB_PATH)
     except:
         pass
 
@@ -115,7 +116,7 @@ class Modeltests(unittest.TestCase):
             db_name = DB_PATH.rsplit('/', 1)[1]
             req = requests.get(
                 '%s/clean/%s' % (FAITOUT_URL, db_name))
-            print req.text
+            print(req.text)
 
 
 def create_distro(session):
@@ -158,6 +159,44 @@ def create_project(session):
         name='R2spec',
         homepage='https://fedorahosted.org/r2spec/',
         user_id='noreply@fedoraproject.org',
+    )
+
+def create_ecosystem_projects(session):
+    """ Create some fake projects from particular upstream ecosystems
+
+    Each project name is used in two different ecosystems
+    """
+    anitya.lib.create_project(
+        session,
+        name='pypi_and_npm',
+        homepage='https://example.com/not-a-real-pypi-project',
+        backend='PyPI',
+        user_id='noreply@fedoraproject.org'
+    )
+
+    anitya.lib.create_project(
+        session,
+        name='pypi_and_npm',
+        homepage='https://example.com/not-a-real-npmjs-project',
+        backend='npmjs',
+        user_id='noreply@fedoraproject.org'
+    )
+
+    anitya.lib.create_project(
+        session,
+        name='rubygems_and_maven',
+        homepage='https://example.com/not-a-real-rubygems-project',
+        backend='Rubygems',
+        user_id='noreply@fedoraproject.org'
+    )
+
+
+    anitya.lib.create_project(
+        session,
+        name='rubygems_and_maven',
+        homepage='https://example.com/not-a-real-maven-project',
+        backend='Maven Central',
+        user_id='noreply@fedoraproject.org'
     )
 
 

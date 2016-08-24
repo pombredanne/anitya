@@ -1,13 +1,37 @@
 FROM fedora
-# cffi>=1.1.0->cryptography->fedmsg->-r
-RUN dnf install -y gcc python-devel libffi-devel openssl-devel git gcc-c++
+FROM fedora:24
+ENV ANITYA_WEB_CONFIG /etc/anitya/config.py
+# Updating libnghttp2 is required in Fedora 24
+RUN dnf update -y libnghttp2 && \
+    dnf install -y \
+        python-flask \
+        python-flask-wtf \
+        python-flask-openid \
+        python-wtforms \
+        python-openid \
+        python-docutils \
+        python-dateutil \
+        python-markupsafe \
+        python-bunch \
+        python-straight-plugin \
+        python-setuptools \
+        python-sqlalchemy \
+        python-psycopg2 \
+        python-mysql \
+        fedmsg \
+        httpd \
+        mod_wsgi && \
+    dnf autoremove -y && \
+    dnf clean all -y
 
-RUN git clone https://github.com/fedora-infra/anitya.git /src
-WORKDIR /src
+COPY ./ /opt/anitya/src
+WORKDIR /opt/anitya/src
 
-# in Fedora we have ancient cffi atm
-# RUN dnf install -y python-cffi
-RUN pip install --user -r requirements.txt
-RUN python createdb.py
-EXPOSE 5000
-CMD ./runserver.py
+RUN mkdir /etc/anitya
+RUN rm -f /etc/httpd/conf.d/welcome.conf
+RUN cp /opt/anitya/src/files/docker_apache.conf /etc/httpd/conf.d/anitya.conf
+RUN chown -R apache:apache /opt/anitya
+RUN chmod +x /opt/anitya/src/files/docker.sh
+
+EXPOSE 80
+ENTRYPOINT /opt/anitya/src/files/docker.sh

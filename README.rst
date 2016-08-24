@@ -21,19 +21,31 @@ Notifications service).
 
 :Github page: https://github.com/fedora-infra/anitya
 
-Hacking
+Development
 -------
 
-Anitya is built using `python2.x`. The following steps all are setup using
-virtualenv having `python2.x`.
+Anitya deployment is currently only supported on Python 2.x, but local
+development can use either Python 2.x or 3.x. The following steps should
+all work regardless of which runtime you have your virtual environment
+configured to use.
 
-Note: The project will not work with `python3` (yet.)
+Vagrant
+```````
+
+To run Anitya in a Vagrant guest, simply run::
+
+    $ sudo vagrant up
+
+You may then access Anitya on your host at::
+
+    http://127.0.0.1:8080
+
 
 virtualenv
 ``````````
 
 Here are some preliminary instructions about how to stand up your own instance
-of anitya. We'll use a virtualenv and a sqlite database and we'll install
+of Anitya. We'll use a virtualenv and a sqlite database and we'll install
 our dependencies from the Python Package Index (PyPI).  None of these are best
 practices for a production instance, but they will do for development.
 
@@ -46,9 +58,34 @@ First, set up a virtualenv::
 Issuing that last command should change your prompt to indicate that you are
 operating in an active virtualenv.
 
+Access to the system site packages is needed for access to the RPM bindings,
+as those aren't available through PyPI, only as RPMs for the system Python
+runtime.
+
 Next, install your dependencies::
 
     (anitya-env)$ pip install -r requirements.txt
+
+
+Running the test suite
+``````````````````````
+
+The tests can be run with a coverage data report via::
+
+    (anitya-env)$ ./runtests.sh
+
+If this is the first time you've run the tests, you'll also want to do::
+
+    (anitya-env)$ pip install -r test_requirements.txt
+
+Regardless of which Python version you have configured in your local venv,
+the tests can be run under both Python 2 & 3 via:
+
+    (anitya-env)$ tox
+
+
+Running a local instance
+````````````````````````
 
 Create the database, by default it will be a sqlite database located at
 ``/var/tmp/anitya-dev.sqlite``::
@@ -63,20 +100,31 @@ running::
 Open your browser and visit http://localhost:5000 to check it out.
 
 
-docker
+Docker
 ``````
-
-You can use dockerfile provided in root of this repository. Build it::
+To build the Docker image::
 
     $ cd anitya/
-    $ docker build --tag=anitya .
+    $ docker build -t anitya .
 
-And run::
+To run the container with a disposable SQLite database::
 
-    $ docker run --net=host anitya
+    $ docker run -e DB_URL='sqlite:////opt/anitya/anitya.db' -d -p 80:80 anitya
 
-``--net=host`` will use network stack from your host system. Application will
-be then available on localhost at http://localhost:5000.
 
-If you inspect the dockerfile you can see that installation method is almost
-identical to the described in section virtualenv_.
+Deployment
+-------
+
+Docker
+``````
+To build the Docker image::
+
+    $ cd anitya/
+    $ docker build -t anitya .
+
+To run the container, execute the command below. Be sure to replace the value of DB_URL with the URL to connect to
+your production database. Also ensure to replace SECRET_KEY with a random string (preferably hex values) that is the
+same on every deployment of Anitya, as this is used for session management::
+
+    $ docker run -e DB_URL='db_type://user:password@server.domain.local:3306/database_name' \
+                 -e SECRET_KEY='123456789abcdef123456789' -d -p 80:80 anitya

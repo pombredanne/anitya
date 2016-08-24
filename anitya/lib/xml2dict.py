@@ -8,6 +8,8 @@ Adjusted by Pierre-Yves Chibon <pingou@pingoured.fr>
 import re
 import xml.etree.ElementTree as ET
 
+import six
+
 
 class object_dict(dict):
     """object view of dict, you can
@@ -80,11 +82,13 @@ class XML2Dict(object):
 
     def parse(self, file):
         """parse a xml file to a dict"""
-        f = open(file, 'r')
+        f = open(file, 'rb')
         return self.fromstring(f.read())
 
     def fromstring(self, s):
         """parse a string"""
+        if isinstance(s, six.text_type):
+            s = s.encode('utf-8')
         t = ET.fromstring(s)
         root_tag, root_tree = self._namespace_split(
             t.tag, self._parse_node(t))
