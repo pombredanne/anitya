@@ -1,4 +1,4 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 """
  (c) 2014 - Copyright Red Hat Inc
@@ -37,5 +37,14 @@ ANITYA_WEB_ALLOW_YAHOO_OPENID = True
 ANITYA_WEB_ALLOW_GENERIC_OPENID = True
 
 ADMIN_EMAIL = 'admin@fedoraproject.org'
+
+ANITYA_LOG_LEVEL = 'INFO'
+
+# The SMTP server to send mail through
+SMTP_SERVER = '127.0.0.1'
+
+# Whether or not to send emails to MAIL_ADMIN via SMTP_SERVER when HTTP 500
+# errors occur.
+EMAIL_ERRORS = False
 
 BLACKLISTED_USERS = []

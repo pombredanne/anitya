@@ -34,11 +34,15 @@ Vagrant
 
 To run Anitya in a Vagrant guest, simply run::
 
-    $ sudo vagrant up
+    $ sudo dnf install vagrant vagrant-libvirt vagrant-sshfs ansible
+    $ cp Vagrantfile.example Vagrantfile
+    $ vagrant up
+    $ vagrant ssh
+    $ systemctl --user start anitya.service
 
 You may then access Anitya on your host at::
 
-    http://127.0.0.1:8080
+    http://127.0.0.1:5000
 
 
 virtualenv
@@ -69,15 +73,6 @@ Next, install your dependencies::
 
 Running the test suite
 ``````````````````````
-
-The tests can be run with a coverage data report via::
-
-    (anitya-env)$ ./runtests.sh
-
-If this is the first time you've run the tests, you'll also want to do::
-
-    (anitya-env)$ pip install -r test_requirements.txt
-
 Regardless of which Python version you have configured in your local venv,
 the tests can be run under both Python 2 & 3 via:
 
@@ -110,6 +105,29 @@ To build the Docker image::
 To run the container with a disposable SQLite database::
 
     $ docker run -e DB_URL='sqlite:////opt/anitya/anitya.db' -d -p 80:80 anitya
+
+
+Listening for local event announcements
+---------------------------------------
+
+To listen for local event announcements over the Federated Message Bus,
+first start a local relay in the background::
+
+    $ fedmsg-relay --config-filename fedmsg.d/fedmsg-config.py &
+
+And then display the received messages in the local console::
+
+    $ fedmsg-tail --config fedmsg.d/fedmsg-config.py --no-validate --really-pretty
+
+These commands will pick up the local config automatically if you're in
+the Anitya checkout directory, but being explicit ensures they don't silently
+default to using the global configuration.
+
+To display the messages, we turn off signature validation (since the local
+server will be emitting unsigned messages) and pretty-print the received JSON.
+
+Refer to the `fedmsg consumer API <http://www.fedmsg.com/en/latest/consuming/>`_
+for more details on receiving event messages programmatically.
 
 
 Deployment

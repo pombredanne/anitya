@@ -1,0 +1,99 @@
+---
+
+- name: Install helpful development packages
+  dnf: name={{ item }} state=present
+  with_items:
+    - git
+    - python-virtualenvwrapper
+    - vim-enhanced
+
+- name: Install anitya system dependencies
+  dnf: name={{ item }} state=present
+  with_items:
+    - fedmsg
+    - gcc
+    - libffi-devel
+    - openssl-devel
+    - postgresql-devel
+    - python2-devel
+    - python3-devel
+    - redhat-rpm-config
+    - rpm-python
+
+# Add various helpful configuration files
+- name: Install a custom bashrc
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  copy: src=bashrc dest=/home/{{ ansible_env.SUDO_USER }}/.bashrc
+
+- name: Install the message of the day
+  copy: src=motd dest=/etc/motd
+
+- name: Install Anitya flask configuration
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  copy: src=config.py dest=/home/{{ ansible_env.SUDO_USER }}/flask_config.py
+
+# We need to use the system-site-packages for now because we use the rpm module
+- name: Create Anitya virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  shell: >
+      source ~/.bashrc && mkvirtualenv anitya -a ~/devel/ &&
+      virtualenv --system-site-packages ~/.virtualenvs/anitya/
+  args:
+    creates: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya
+
+- name: Install Anitya requirements into the virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    requirements: "requirements.txt"
+    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
+    virtualenv_python: python2
+  args:
+    chdir: /home/{{ ansible_env.SUDO_USER }}/devel
+
+- name: Install PostgreSQL driver in the virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    name: "psycopg2"
+    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
+    virtualenv_python: python2
+  args:
+    chdir: /home/{{ ansible_env.SUDO_USER }}/devel
+
+- name: Install Anitya test requirements into the virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    requirements: "test_requirements.txt"
+    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
+    virtualenv_python: python2
+  args:
+    chdir: /home/{{ ansible_env.SUDO_USER }}/devel
+
+- name: Install Tox
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip: name=tox virtualenv=/home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
+
+- name: Install Anitya into the virtualenv
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    name: "file:///home/{{ ansible_env.SUDO_USER }}/devel"
+    extra_args: "-e"
+    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
+    virtualenv_python: python2
+
+- name: Create user systemd directory
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  file:
+    path: /home/{{ ansible_env.SUDO_USER }}/.config/systemd/user/
+    state: directory
+
+- name: Install the Anitya systemd service file
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  copy:
+    src: anitya.service
+    dest: /home/{{ ansible_env.SUDO_USER }}/.config/systemd/user/anitya.service
+
+- name: Reload the systemd daemon
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  command: systemctl --user daemon-reload
+
+- include: db.yml

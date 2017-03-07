@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import logging
-import warnings
 
 import anitya.lib.plugins
 import anitya.lib.exceptions
@@ -18,7 +17,7 @@ else:
 __api_version__ = '1.0'
 
 
-LOG = logging.getLogger('anitya')
+_log = logging.getLogger(__name__)
 
 
 def fedmsg_publish(*args, **kwargs):  # pragma: no cover
@@ -35,7 +34,7 @@ def fedmsg_publish(*args, **kwargs):  # pragma: no cover
         import fedmsg
         fedmsg.publish(*args, **kwargs)
     except Exception as err:
-        warnings.warn(str(err))
+        _log.error(str(err))
 
 
 # Ordering is handled differently based on Python version
@@ -74,7 +73,7 @@ def check_release(project, session, test=False):
     try:
         up_version = backend.get_version(project)
     except anitya.lib.exceptions.AnityaPluginException as err:
-        LOG.exception("AnityaError catched:")
+        _log.exception("AnityaError catched:")
         project.logs = str(err)
         session.add(project)
         session.commit()

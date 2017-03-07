@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014 - Copyright Red Hat Inc
+ (c) 2014-2016 - Copyright Red Hat Inc
 
  Authors:
    Pierre-Yves Chibon <pingou@pingoured.fr>
@@ -9,12 +9,10 @@
 anitya internal library.
 """
 
-
-__requires__ = ['SQLAlchemy >= 0.7']
-import pkg_resources
-
 import logging
-import sys
+
+__requires__ = ['SQLAlchemy >= 0.7']  # NOQA
+import pkg_resources  # NOQA
 
 import sqlalchemy as sa
 from sqlalchemy import create_engine
@@ -27,10 +25,7 @@ import anitya.lib
 import anitya.lib.model
 import anitya.lib.exceptions
 
-log = logging.getLogger('anitya.lib')
-STDERR_LOG = logging.StreamHandler(sys.stderr)
-STDERR_LOG.setLevel(logging.INFO)
-log.addHandler(STDERR_LOG)
+_log = logging.getLogger(__name__)
 
 
 def init(db_url, alembic_ini=None, debug=False, create=False):
@@ -102,7 +97,7 @@ def create_project(
     try:
         session.flush()
     except SQLAlchemyError as err:
-        log.exception(err)
+        _log.exception(err)
         session.rollback()
         raise anitya.lib.exceptions.AnityaException(
             'Could not add this project, already exists?')
@@ -141,14 +136,15 @@ def edit_project(
         old = project.backend
         project.backend = backend
         changes['backend'] = {'old': old, 'new': project.backend}
-    if  version_url != project.version_url:
+    if version_url != project.version_url:
         old = project.version_url
         project.version_url = version_url.strip() if version_url else None
         if old != project.version_url:
             changes['version_url'] = {'old': old, 'new': project.version_url}
-    if  version_prefix != project.version_prefix:
+    if version_prefix != project.version_prefix:
         old = project.version_prefix
-        project.version_prefix = version_prefix.strip() if version_prefix else None
+        project.version_prefix = version_prefix.strip() \
+            if version_prefix else None
         if old != project.version_prefix:
             changes['version_prefix'] = {
                 'old': old, 'new': project.version_prefix}
@@ -180,7 +176,7 @@ def edit_project(
         if check_release is True:
             anitya.check_release(project, session)
     except SQLAlchemyError as err:
-        log.exception(err)
+        _log.exception(err)
         session.rollback()
         raise anitya.lib.exceptions.AnityaException(
             'Could not edit this project. Is there already a project '
@@ -229,8 +225,8 @@ def map_project(
         session, package_name, distro)
     if other_pkg and other_pkg.project:
         raise anitya.lib.exceptions.AnityaInvalidMappingException(
-                pkgname, distro, package_name, distribution,
-                other_pkg.project.id, other_pkg.project.name)
+            pkgname, distro, package_name, distribution,
+            other_pkg.project.id, other_pkg.project.name)
 
     edited = None
     if not pkg:
@@ -258,7 +254,7 @@ def map_project(
     try:
         session.flush()
     except SQLAlchemyError as err:  # pragma: no cover
-        log.exception(err)
+        _log.exception(err)
         # We cannot test this situation
         session.rollback()
         raise anitya.lib.exceptions.AnityaException(
@@ -301,7 +297,7 @@ def flag_project(session, project, reason, user_email, user_id):
     try:
         session.flush()
     except SQLAlchemyError as err:
-        log.exception(err)
+        _log.exception(err)
         session.rollback()
         raise anitya.lib.exceptions.AnityaException(
             'Could not flag this project.')
@@ -338,7 +334,7 @@ def set_flag_state(session, flag, state, user_id):
     try:
         session.flush()
     except SQLAlchemyError as err:
-        log.exception(err)
+        _log.exception(err)
         session.rollback()
         raise anitya.lib.exceptions.AnityaException(
             'Could not set the state of this flag.')

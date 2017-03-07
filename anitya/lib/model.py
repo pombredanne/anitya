@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014 - Copyright Red Hat Inc
+ (c) 2014-2016 - Copyright Red Hat Inc
 
  Authors:
    Pierre-Yves Chibon <pingou@pingoured.fr>
@@ -9,13 +9,12 @@
 anitya mapping of python classes to Database Tables.
 """
 
-
-__requires__ = ['SQLAlchemy >= 0.7']
-import pkg_resources
-
 import datetime
 import logging
 import time
+
+__requires__ = ['SQLAlchemy >= 0.7']  # NOQA
+import pkg_resources  # NOQA
 
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
@@ -27,7 +26,8 @@ import anitya
 
 BASE = declarative_base()
 
-log = logging.getLogger(__name__)
+
+_log = logging.getLogger(__name__)
 
 
 def _paginate_query(query, page):
@@ -119,7 +119,10 @@ class Log(BASE):
             query = query.filter(cls.created_on >= from_date)
 
         if user:
-            query = query.filter(cls.user == user)
+            if isinstance(user, (list, tuple)):
+                query = query.filter(cls.user.in_(user))
+            else:
+                query = query.filter(cls.user == user)
 
         query = query.order_by(cls.created_on.desc())
 
@@ -159,7 +162,8 @@ class Ecosystem(BASE):
     name = sa.Column(sa.String(200), primary_key=True)
     default_backend_name = sa.Column(
         sa.String(200),
-        sa.ForeignKey("backends.name",
+        sa.ForeignKey(
+            "backends.name",
             ondelete="cascade",
             onupdate="cascade"),
         unique=True
@@ -337,7 +341,8 @@ class Project(BASE):
     )
     ecosystem_name = sa.Column(
         sa.String(200),
-        sa.ForeignKey("ecosystems.name",
+        sa.ForeignKey(
+            "ecosystems.name",
             ondelete="set null",
             onupdate="cascade",
             name="FK_ECOSYSTEM_FOR_PROJECT"),
@@ -376,7 +381,7 @@ class Project(BASE):
 
     def __json__(self, detailed=False):
         output = dict(
-            id = self.id,
+            id=self.id,
             name=self.name,
             homepage=self.homepage,
             regex=self.regex,
@@ -396,8 +401,6 @@ class Project(BASE):
     def get_or_create(cls, session, name, homepage, backend='custom'):
         project = cls.by_name_and_homepage(session, name, homepage)
         if not project:
-            #print "Creating %s/%s(%s)" % (name, homepage, backend)
-
             # Before creating, make sure the backend already exists
             backend_obj = Backend.get(session, name=backend)
             if not backend_obj:
@@ -426,17 +429,28 @@ class Project(BASE):
 
     @classmethod
     def by_name_and_homepage(cls, session, name, homepage):
-        return session.query(cls)\
-            .filter_by(name=name)\
-            .filter_by(homepage=homepage).first()
+        query = session.query(
+            cls
+        ).filter(
+            cls.name == name
+        ).filter(
+            cls.homepage == homepage
+        )
+        return query.first()
 
     @classmethod
     def by_name_and_ecosystem(cls, session, name, ecosystem):
         try:
-            return (session.query(cls)
-                    .filter_by(name=name)
-                    .join(Project.ecosystem)
-                    .filter(Ecosystem.name==ecosystem).one())
+            query = session.query(
+                cls
+            ).filter(
+                cls.name == name
+            ).join(
+                Project.ecosystem
+            ).filter(
+                Ecosystem.name == ecosystem
+            )
+            return query.one()
         except NoResultFound:
             return None
 
@@ -476,8 +490,8 @@ class Project(BASE):
 
     @classmethod
     def updated(
-        cls, session, status='updated', name=None, log=None,
-        page=None, count=False):
+            cls, session, status='updated', name=None, log=None,
+            page=None, count=False):
         ''' Method used to retrieve projects according to their logs and
         how they performed at the last cron job.
 
@@ -501,31 +515,31 @@ class Project(BASE):
 
         if status == 'updated':
             query = query.filter(
-                Project.logs != None,
+                Project.logs.isnot(None),
                 Project.logs == 'Version retrieved correctly',
             )
         elif status == 'failed':
             query = query.filter(
-                Project.logs != None,
+                Project.logs.isnot(None),
                 Project.logs != 'Version retrieved correctly',
                 ~Project.logs.ilike('Something strange occured%'),
             )
         elif status == 'odd':
             query = query.filter(
-                Project.logs != None,
+                Project.logs.isnot(None),
                 Project.logs != 'Version retrieved correctly',
                 Project.logs.ilike('Something strange occured%'),
             )
 
         elif status == 'new':
             query = query.filter(
-                Project.logs == None,
+                Project.logs.is_(None),
             )
         elif status == 'never_updated':
             query = query.filter(
-                Project.logs != None,
+                Project.logs.isnot(None),
                 Project.logs != 'Version retrieved correctly',
-                Project.latest_version == None,
+                Project.latest_version.is_(None),
             )
 
         if name:
@@ -559,22 +573,22 @@ class Project(BASE):
     def search(cls, session, pattern, distro=None, page=None, count=False):
         ''' Search the projects by their name or package name '''
 
-        pattern = pattern.replace('_', '\_')
-        if '*' in pattern:
-            pattern = pattern.replace('*', '%')
-
         query1 = session.query(
             cls
         )
 
-        if '%' in pattern:
-            query1 = query1.filter(
-                Project.name.ilike(pattern)
-            )
-        else:
-            query1 = query1.filter(
-                Project.name == pattern
-            )
+        if pattern:
+            pattern = pattern.replace('_', '\_')
+            if '*' in pattern:
+                pattern = pattern.replace('*', '%')
+            if '%' in pattern:
+                query1 = query1.filter(
+                    Project.name.ilike(pattern)
+                )
+            else:
+                query1 = query1.filter(
+                    Project.name == pattern
+                )
 
         query2 = session.query(
             cls
@@ -582,14 +596,15 @@ class Project(BASE):
             Project.id == Packages.project_id
         )
 
-        if '%' in pattern:
-            query2 = query2.filter(
-                Packages.package_name.ilike(pattern)
-            )
-        else:
-            query2 = query2.filter(
-                Packages.package_name == pattern
-            )
+        if pattern:
+            if '%' in pattern:
+                query2 = query2.filter(
+                    Packages.package_name.ilike(pattern)
+                )
+            else:
+                query2 = query2.filter(
+                    Packages.package_name == pattern
+                )
 
         if distro is not None:
             query1 = query1.filter(
@@ -660,7 +675,7 @@ class ProjectFlag(BASE):
 
     def __json__(self, detailed=False):
         output = dict(
-            id = self.id,
+            id=self.id,
             project=self.project.name,
             user=self.user,
             state=self.state,

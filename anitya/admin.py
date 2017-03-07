@@ -2,6 +2,7 @@
 
 from dateutil import parser
 from math import ceil
+import logging
 
 import flask
 from sqlalchemy.exc import SQLAlchemyError
@@ -10,7 +11,10 @@ import anitya
 import anitya.forms
 import anitya.lib.model
 
-from anitya.app import LOG, APP, SESSION, login_required, is_admin
+from anitya.app import APP, SESSION, login_required, is_admin
+
+
+_log = logging.getLogger(__name__)
 
 
 @APP.route('/distro/add', methods=['GET', 'POST'])
@@ -41,7 +45,7 @@ def add_distro():
             SESSION.add(distro)
             SESSION.commit()
             flask.flash('Distribution added')
-        except SQLAlchemyError as err:
+        except SQLAlchemyError:
             flask.flash(
                 'Could not add this distro, already exists?', 'error')
         return flask.redirect(
@@ -302,7 +306,7 @@ def browse_logs():
     if is_admin():
         user = flask.request.args.get('user', None)
     else:
-        user = flask.g.auth.openid
+        user = [flask.g.auth.openid, flask.g.auth.email]
 
     from_date = flask.request.args.get('from_date', None)
     project = flask.request.args.get('project', None)
@@ -355,7 +359,7 @@ def browse_logs():
             count=True
         )
     except Exception as err:
-        LOG.exception(err)
+        _log.exception(err)
         flask.flash(err, 'errors')
 
     total_page = int(ceil(cnt_logs / float(limit)))
@@ -437,7 +441,7 @@ def browse_flags():
             count=True
         )
     except Exception as err:
-        LOG.exception(err)
+        _log.exception(err)
         flask.flash(err, 'errors')
 
     total_page = int(ceil(cnt_flags / float(limit)))

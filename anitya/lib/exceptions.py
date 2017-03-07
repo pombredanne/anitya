@@ -1,12 +1,26 @@
-#-*- coding: utf-8 -*-
-
+# -*- coding: utf-8 -*-
+#
+# This file is part of the Anitya project.
+# Copyright (C) 2014-2016  Red Hat, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 """
- (c) 2014 - Copyright Red Hat Inc
+Exceptions used by Anitya.
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-
-anitya exceptions.
+Authors:
+    Pierre-Yves Chibon <pingou@pingoured.fr>
 """
 
 
@@ -22,7 +36,7 @@ class AnityaPluginException(AnityaException):
     pass
 
 
-class AnityaInvalidMappingException(Exception):
+class AnityaInvalidMappingException(AnityaException):
     ''' Specific exception class for invalid mapping. '''
 
     def __init__(self, pkgname, distro, found_pkgname,
@@ -38,14 +52,14 @@ class AnityaInvalidMappingException(Exception):
     @property
     def message(self):
         return 'Could not edit the mapping of {pkgname} on ' \
-                '{distro}, there is already a package {found_pkgname} on ' \
-                '{found_distro} as part of the project <a href="{link}">' \
-                '{project_name}</a>.'.format(
-            pkgname=self.pkgname,
-            distro=self.distro,
-            found_pkgname=self.found_pkgname,
-            found_distro=self.found_distro,
-            project_id=self.project_id,
-            project_name=self.project_name,
-            link= self.link,
-        )
+            '{distro}, there is already a package {found_pkgname} on ' \
+            '{found_distro} as part of the project <a href="{link}">' \
+            '{project_name}</a>.'.format(
+                pkgname=self.pkgname,
+                distro=self.distro,
+                found_pkgname=self.found_pkgname,
+                found_distro=self.found_distro,
+                project_id=self.project_id,
+                project_name=self.project_name,
+                link=self.link,
+            )

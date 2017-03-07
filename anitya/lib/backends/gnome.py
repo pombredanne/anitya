@@ -8,11 +8,15 @@
 
 """
 
-import anitya
+import logging
+
 from anitya.lib.backends import BaseBackend, get_versions_by_regex
 
 
 REGEX = 'href="([0-9][0-9.]*)/"'
+
+
+_log = logging.getLogger(__name__)
 
 
 def use_gnome_cache_json(project):
@@ -36,7 +40,7 @@ def use_gnome_regex(project):
     '''
     output = []
     url = 'https://download.gnome.org/sources/%(name)s/' % {
-                'name': project.name}
+        'name': project.name}
     output = get_versions_by_regex(url, REGEX, project)
     return output
 
@@ -91,7 +95,7 @@ class GnomeBackend(BaseBackend):
             # First try to get the version by using the cache.json file
             output = use_gnome_cache_json(project)
         except Exception as err:
-            anitya.LOG.exception(err)
+            _log.exception(err)
             output = use_gnome_regex(project)
 
         return output

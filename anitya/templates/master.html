@@ -9,7 +9,8 @@
 
     <link rel="shortcut icon" href="{{ url_for('static', filename='ico/favicon.ico') }}">
 
-    <title>Anitya</title>
+    <!-- Page Title -->
+    <title>{% block title %}{% endblock %}</title>
 
     <link href="{{ url_for('static', filename='bootstrap/css/bootstrap.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/text.css') }}" rel="stylesheet" />
@@ -205,11 +206,13 @@
       <div class="container">
         <p class="text-muted credit">
         Anitya ({{ version }}):
+        <a href="{{ url_for('api') }}">API</a>
+        --
         <a href="https://github.com/fedora-infra/anitya">sources</a>
         --
         <a href="https://github.com/fedora-infra/anitya/issues">issue tracker</a>
         .
-        ©2013-2014 Red Hat, Inc., <a href="http://pingoured.fr">pingou</a>.
+        ©2013-2016 Red Hat, Inc., <a href="http://pingoured.fr">pingou</a>.
         {% if cron_status %}
         Last check {{ cron_status.status }} at (UTC) {{
             cron_status.created_on.strftime('%Y-%m-%d %H:%M:%S') }}
