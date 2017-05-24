@@ -23,8 +23,6 @@
 anitya tests for the Maven backend.
 '''
 
-__requires__ = ['SQLAlchemy >= 0.7']
-
 import unittest
 
 from anitya.lib.backends.maven import MavenBackend
@@ -92,6 +90,17 @@ class MavenBackendTest(Modeltests):
             homepage='http://repo1.maven.org/maven2/'\
                      'org/codehaus/plexus/plexus-maven-plugin/',
         )
+
+    def test_dots_in_artifact_id(self):
+        project = model.Project(
+            backend=BACKEND,
+            name='felix-gogo-shell',
+            homepage='http://www.apache.org/dist/felix/',
+            version_url='org.apache.felix:org.apache.felix.gogo.shell',
+        )
+        exp = '1.0.0'
+        obs = MavenBackend.get_version(project)
+        self.assertEqual(obs, exp)
 
     def test_maven_get_versions(self):
         project = model.Project(

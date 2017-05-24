@@ -7,20 +7,22 @@ the default configuration, loading and configuring Flask extensions, and
 configuring logging.
 
 User-facing Flask routes should be placed in the ``anitya.ui`` module and API
-routes should be placed in ``anitya.api``.
+routes should be placed in ``anitya.api_v2``.
 """
 
 import functools
 import logging
 import logging.config
 import logging.handlers
-import os
 
 import flask
 from bunch import Bunch
-from flask_openid import OpenID
+from flask_restful import Api
 
+from anitya.config import config as anitya_config
+from anitya.lib.model import Session as SESSION, initialize as initialize_db
 import anitya.lib
+import anitya.authentication
 import anitya.mail_logging
 
 
@@ -28,46 +30,10 @@ __version__ = '0.11.0'
 
 # Create the application.
 APP = flask.Flask(__name__)
+APP.config.update(anitya_config)
+initialize_db(anitya_config)
 
-APP.config.from_object('anitya.default_config')
-if 'ANITYA_WEB_CONFIG' in os.environ:  # pragma: no cover
-    APP.config.from_envvar('ANITYA_WEB_CONFIG')
 
-# Set up OpenID
-APP.oid = OpenID(APP)
-
-# Set up the logging
-logging_config = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'simple': {
-            'format': '[%(name)s %(levelname)s] %(message)s',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-            'stream': 'ext://sys.stdout',
-        }
-    },
-    'loggers': {
-        'anitya': {
-            'level': APP.config['ANITYA_LOG_LEVEL'],
-            'propagate': False,
-            'handlers': ['console'],
-        },
-    },
-    # The root logger configuration; this is a catch-all configuration
-    # that applies to all log messages not handled by a different logger
-    'root': {
-        'level': APP.config['ANITYA_LOG_LEVEL'],
-        'handlers': ['console'],
-    },
-}
-
-logging.config.dictConfig(logging_config)
 if APP.config['EMAIL_ERRORS']:
     # If email logging is configured, set up the anitya logger with an email
     # handler for any ERROR-level logs.
@@ -77,8 +43,11 @@ if APP.config['EMAIL_ERRORS']:
         mail_admin=APP.config.get('ADMIN_EMAIL')
     ))
 
-SESSION = anitya.lib.init(
-    APP.config['DB_URL'], debug=False, create=False)
+# Set up OpenID and OpenIDConnect
+anitya.authentication.configure_openid(APP)
+
+# Set up the Flask Restful API endpoints
+APP.api = Api(APP)
 
 
 @APP.template_filter('format_examples')
@@ -200,5 +169,6 @@ def inject_variable():
 
 # Finalize the import of other controllers
 from . import api  # NOQA
+from . import api_v2  # NOQA
 from . import ui  # NOQA
 from . import admin  # NOQA

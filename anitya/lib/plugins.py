@@ -1,23 +1,30 @@
 # -*- coding: utf-8 -*-
-
-"""
- (c) 2014-2016 - Copyright Red Hat Inc
-
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-
-Module handling the load/call of the plugins of anitya
-"""
+# This file is a part of the Anitya project.
+#
+# Copyright © 2014-2017 Pierre-Yves Chibon <pingou@pingoured.fr>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+"""Module handling the load/call of the plugins of anitya."""
 
 import logging
 
-from sqlalchemy.exc import SQLAlchemyError
-
 from straight.plugin import load
 
-import anitya.lib.model as model
 from anitya.lib.backends import BaseBackend
 from anitya.lib.ecosystems import BaseEcosystem
+from anitya.lib.versions import Version
 
 _log = logging.getLogger(__name__)
 
@@ -48,49 +55,18 @@ class _PluginManager(object):
 
 BACKEND_PLUGINS = _PluginManager('anitya.lib.backends', BaseBackend)
 ECOSYSTEM_PLUGINS = _PluginManager('anitya.lib.ecosystems', BaseEcosystem)
+VERSION_PLUGINS = _PluginManager('anitya.lib.versions', Version)
 
 
 def _load_backend_plugins(session):
     """Load any new backend plugins into the DB"""
-    backends = [bcke.name for bcke in model.Backend.all(session)]
     plugins = list(BACKEND_PLUGINS.get_plugins())
-    # Add any new Backend definitions
-    plugin_names = [plugin.name for plugin in plugins]
-    for backend in set(backends).symmetric_difference(set(plugin_names)):
-        _log.info("Registering backend %r", backend)
-        bcke = model.Backend(name=backend)
-        session.add(bcke)
-        try:
-            session.commit()
-        except SQLAlchemyError as err:  # pragma: no cover
-            # We cannot test this as it would come from a defective DB
-            print(err)
-            session.rollback()
     return plugins
 
 
 def _load_ecosystem_plugins(session):
     """Load any new ecosystem plugins into the DB"""
-    ecosystems = [ecosystem.name for ecosystem in model.Ecosystem.all(session)]
     plugins = list(ECOSYSTEM_PLUGINS.get_plugins())
-    # Add any new Ecosystem definitions
-    backends_by_ecosystem = dict((plugin.name, plugin.default_backend)
-                                 for plugin in plugins)
-    eco_names = set(ecosystems).symmetric_difference(
-        set(backends_by_ecosystem))
-    for eco_name in eco_names:
-        backend = backends_by_ecosystem[eco_name]
-        bcke = model.Backend.by_name(session, backend)
-        _log.info("Registering ecosystem %r with default backend %r",
-                  eco_name, backend)
-        ecosystem = model.Ecosystem(name=eco_name, default_backend=bcke)
-        session.add(ecosystem)
-        try:
-            session.commit()
-        except SQLAlchemyError as err:  # pragma: no cover
-            # We cannot test this as it would come from a defective DB
-            print(err)
-            session.rollback()
     return plugins
 
 

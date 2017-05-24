@@ -36,6 +36,25 @@ class AnityaPluginException(AnityaException):
     pass
 
 
+class ProjectExists(AnityaException):
+    """
+    Raised when a project already exists in the database.
+
+    This is only raised when a project is part of an ecosystem, since projects
+    outside of an ecosystem have no uniqueness constraints.
+    """
+    def __init__(self, requested_project):
+        self.requested_project = requested_project
+
+    def to_dict(self):
+        return {
+            u'requested_project': self.requested_project.__json__(),
+        }
+
+    def __str__(self):
+        return 'Unable to create project since it already exists.'
+
+
 class AnityaInvalidMappingException(AnityaException):
     ''' Specific exception class for invalid mapping. '''
 
@@ -63,3 +82,23 @@ class AnityaInvalidMappingException(AnityaException):
                 project_name=self.project_name,
                 link=self.link,
             )
+
+
+class InvalidVersion(AnityaException):
+    """
+    Raised when the version string is not valid for the given version scheme.
+
+    Args:
+        version (str): The version string that failed to parse.
+        exception (Exception): The underlying exception that triggered this one.
+    """
+
+    def __init__(self, version, exception=None):
+        self.version = version
+        self.exception = exception
+
+    def __str__(self):
+        if self.exception:
+            return 'Invalid version "{v}": {e}'.format(v=self.version, e=str(self.exception))
+        else:
+            return 'Invalid version "{v}"'.format(v=self.version)

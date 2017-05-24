@@ -11,12 +11,9 @@ anitya internal library.
 
 import logging
 
-__requires__ = ['SQLAlchemy >= 0.7']  # NOQA
-import pkg_resources  # NOQA
-
 import sqlalchemy as sa
 from sqlalchemy import create_engine
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
 
@@ -31,6 +28,9 @@ _log = logging.getLogger(__name__)
 def init(db_url, alembic_ini=None, debug=False, create=False):
     """ Create the tables in the database using the information from the
     url obtained.
+
+    :deprecated: This function is deprecated as of Anitya 0.12. Use the
+                 scoped session in :mod:`anitya.lib.model`
 
     :arg db_url, URL used to connect to the database. The URL contains
         information with regards to the database engine, the host to
@@ -74,28 +74,33 @@ def init(db_url, alembic_ini=None, debug=False, create=False):
 def create_project(
         session, name, homepage, user_id, backend='custom',
         version_url=None, version_prefix=None, regex=None,
-        check_release=False):
+        check_release=False, insecure=False):
     """ Create the project in the database.
 
     """
     # Set the ecosystem if there's one associated with the given backend
-    backend_ref = anitya.lib.model.Backend.by_name(session, name=backend)
-    ecosystem_ref = backend_ref.default_ecosystem
+    ecosystems = [e for e in anitya.lib.plugins.ECOSYSTEM_PLUGINS.get_plugins()
+                  if e.default_backend == backend]
+    ecosystem_name = ecosystems[0].name if len(ecosystems) == 1 else None
 
     project = anitya.lib.model.Project(
         name=name,
         homepage=homepage,
         backend=backend,
-        ecosystem=ecosystem_ref,
+        ecosystem_name=ecosystem_name,
         version_url=version_url,
         regex=regex,
         version_prefix=version_prefix,
+        insecure=insecure
     )
 
     session.add(project)
 
     try:
         session.flush()
+    except IntegrityError:
+        session.rollback()
+        raise anitya.lib.exceptions.ProjectExists(project)
     except SQLAlchemyError as err:
         _log.exception(err)
         session.rollback()

@@ -23,14 +23,12 @@
 anitya tests of the plugins.
 '''
 
-__requires__ = ['SQLAlchemy >= 0.7']
-import pkg_resources
-
 import datetime
 import unittest
 
 from anitya.lib import plugins
 from anitya.lib import model
+from anitya.lib.versions import Version
 from anitya.tests.base import Modeltests
 
 EXPECTED_BACKENDS = [
@@ -51,18 +49,21 @@ EXPECTED_ECOSYSTEMS = {
 }
 
 
+class VersionPluginsTests(unittest.TestCase):
+    """Tests for the version scheme plugins."""
+
+    def test_version_plugin_names(self):
+        plugin_names = plugins.VERSION_PLUGINS.get_plugin_names()
+        self.assertEqual(['RPM'], plugin_names)
+
+    def test_version_plugin_classes(self):
+        version_plugins = plugins.VERSION_PLUGINS.get_plugins()
+        for plugin in version_plugins:
+            self.assertTrue(issubclass(plugin, Version))
+
+
 class Pluginstests(Modeltests):
     """ Plugins tests. """
-
-    def _check_db_contents(self, expected_backends, expected_ecosystems):
-        backends = model.Backend.all(self.session)
-        backend_names_from_db = sorted(backend.name for backend in backends)
-        self.assertEqual(sorted(backend_names_from_db), sorted(expected_backends))
-        ecosystems = model.Ecosystem.all(self.session)
-        ecosystems_from_db = dict((eco.name, eco.default_backend.name)
-                                  for eco in ecosystems)
-        self.assertEqual(ecosystems_from_db, expected_ecosystems)
-
 
     def test_load_all_plugins(self):
         """ Test the plugins.load_all_plugins function. """
@@ -77,16 +78,12 @@ class Pluginstests(Modeltests):
                               for plugin in ecosystem_plugins)
         self.assertEqual(ecosystems, EXPECTED_ECOSYSTEMS)
 
-        self._check_db_contents(EXPECTED_BACKENDS, EXPECTED_ECOSYSTEMS)
-
     def test_load_plugins(self):
         """ Test the plugins.load_plugins function. """
         backend_plugins = plugins.load_plugins(self.session)
         self.assertEqual(len(backend_plugins), len(EXPECTED_BACKENDS))
         backend_names = sorted(plugin.name for plugin in backend_plugins)
         self.assertEqual(sorted(backend_names), sorted(EXPECTED_BACKENDS))
-
-        self._check_db_contents(EXPECTED_BACKENDS, EXPECTED_ECOSYSTEMS)
 
     def test_plugins_get_plugin_names(self):
         """ Test the plugins.get_plugin_names function. """

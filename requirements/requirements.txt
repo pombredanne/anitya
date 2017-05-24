@@ -1,15 +1,18 @@
 alembic
 bunch
 dateutils
-docutils
 fedmsg
-flask
 flask-openid
+# Need the fixes for https://github.com/puiterwijk/flask-oidc/issues/12
+#                and https://github.com/puiterwijk/flask-oidc/issues/24
+flask-oidc >= 1.1.1
+flask-restful
 flask-wtf
-markupsafe
+jinja2 >= 2.4
 python-openid; python_version < '3.0'
 python3-openid; python_version >= '3.0'
-sqlalchemy
+sqlalchemy >= 0.9
 # https://github.com/ironfroggy/straight.plugin/issues/17#issuecomment-41466275
 straight.plugin==1.4.0-post-1
+pytoml
 wtforms

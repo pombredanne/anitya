@@ -4,10 +4,6 @@
 Setup script
 """
 
-# Required to build on EL6
-__requires__ = ['SQLAlchemy >= 0.7', 'jinja2 >= 2.4']
-import pkg_resources
-
 from setuptools import setup, find_packages
 import re
 
@@ -22,7 +18,7 @@ def get_project_version():
         raise ValueError(err_msg % (version_pattern, version_file))
     return match.groups()[0].decode("utf-8")
 
-def get_requirements(requirements_file='requirements.txt'):
+def get_requirements(requirements_file='requirements/requirements.txt'):
     """Get the contents of a file listing the requirements.
 
     :arg requirements_file: path to a requirements file
@@ -33,11 +29,24 @@ def get_requirements(requirements_file='requirements.txt'):
     """
 
     lines = open(requirements_file).readlines()
-    return [
-        line.rstrip().split('#')[0]
-        for line in lines
-        if not line.startswith('#')
-    ]
+    dependencies = []
+    for line in lines:
+        maybe_dep = line.strip()
+        if maybe_dep.startswith('#'):
+            # Skip pure comment lines
+            continue
+        if maybe_dep.startswith('git+'):
+            # VCS reference for dev purposes, expect a trailing comment
+            # with the normal requirement
+            __, __, maybe_dep = maybe_dep.rpartition('#')
+        else:
+            # Ignore any trailing comment
+            maybe_dep, __, __ = maybe_dep.partition('#')
+        # Remove any whitespace and assume non-empty results are dependencies
+        maybe_dep = maybe_dep.strip()
+        if maybe_dep:
+            dependencies.append(maybe_dep)
+    return dependencies
 
 
 setup(
