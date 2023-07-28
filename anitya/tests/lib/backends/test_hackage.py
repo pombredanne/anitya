@@ -19,86 +19,88 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 anitya tests for the custom backend.
-'''
+"""
 
-import json
 import unittest
 
 import anitya.lib.backends.hackage as backend
-import anitya.lib.model as model
+from anitya.db import models
 from anitya.lib.exceptions import AnityaPluginException
-from anitya.tests.base import Modeltests, create_distro, skip_jenkins
+from anitya.tests.base import DatabaseTestCase, create_distro
+
+BACKEND = "Hackage"
 
 
-BACKEND = 'Hackage'
+class HackageBackendtests(DatabaseTestCase):
+    """Hackage backend tests."""
 
-
-class HackageBackendtests(Modeltests):
-    """ Hackage backend tests. """
-
-    @skip_jenkins
     def setUp(self):
-        """ Set up the environnment, ran before every tests. """
-        super(HackageBackendtests, self).setUp()
+        """Set up the environnment, ran before every tests."""
+        super().setUp()
 
         create_distro(self.session)
         self.create_project()
 
     def create_project(self):
-        """ Create some basic projects to work with. """
-        project = model.Project(
-            name='Biobase',
-            homepage='http://hackage.haskell.org/package/Biobase',
+        """Create some basic projects to work with."""
+        project = models.Project(
+            name="Biobase",
+            homepage="https://hackage.haskell.org/package/Biobase",
             backend=BACKEND,
         )
         self.session.add(project)
         self.session.commit()
 
-        project = model.Project(
-            name='foobar',
-            homepage='http://hackage.haskell.org/package/foobar',
+        project = models.Project(
+            name="non-existent-package-that-does-not-exist",
+            homepage="https://hackage.haskell.org/package/non-existent-package-that-does-not-exist",
             backend=BACKEND,
         )
         self.session.add(project)
         self.session.commit()
-
 
     def test_get_version(self):
-        """ Test the get_version function of the custom backend. """
+        """Test the get_version function of the custom backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = '0.3.1.1'
+        project = models.Project.get(self.session, pid)
+        exp = "0.3.1.1"
         obs = backend.HackageBackend.get_version(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.HackageBackend.get_version,
-            project
+            AnityaPluginException, backend.HackageBackend.get_version, project
         )
 
+    def test_get_version_url(self):
+        """Assert that correct url is returned."""
+        project = models.Project(
+            name="test", homepage="http://example.org", backend=BACKEND
+        )
+        exp = "https://hackage.haskell.org/package/test"
+
+        obs = backend.HackageBackend.get_version_url(project)
+
+        self.assertEqual(obs, exp)
 
     def test_get_versions(self):
-        """ Test the get_versions function of the custom backend. """
+        """Test the get_versions function of the custom backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = ['0.3.1.1']
+        project = models.Project.get(self.session, pid)
+        exp = ["0.3.1.1"]
         obs = backend.HackageBackend.get_ordered_versions(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.HackageBackend.get_version,
-            project
+            AnityaPluginException, backend.HackageBackend.get_version, project
         )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     SUITE = unittest.TestLoader().loadTestsFromTestCase(HackageBackendtests)
     unittest.TextTestRunner(verbosity=2).run(SUITE)

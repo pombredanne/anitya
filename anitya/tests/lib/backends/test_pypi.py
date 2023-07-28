@@ -19,126 +19,168 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 anitya tests for the pypi backend.
-'''
+"""
 
-import json
-import unittest
+import mock
 
 import anitya.lib.backends.pypi as backend
-import anitya.lib.model as model
+from anitya.db import models
 from anitya.lib.exceptions import AnityaPluginException
-from anitya.tests.base import Modeltests, create_distro, skip_jenkins
+from anitya.tests.base import DatabaseTestCase, create_distro
+
+BACKEND = "PyPI"
 
 
-BACKEND = 'PyPI'
+class PypiBackendtests(DatabaseTestCase):
+    """pypi backend tests."""
 
-
-class PypiBackendtests(Modeltests):
-    """ pypi backend tests. """
-
-    @skip_jenkins
     def setUp(self):
-        """ Set up the environnment, ran before every tests. """
-        super(PypiBackendtests, self).setUp()
+        """Set up the environnment, ran before every tests."""
+        super().setUp()
 
         create_distro(self.session)
-        self.create_project()
 
-    def create_project(self):
-        """ Create some basic projects to work with. """
-        project = model.Project(
-            name='repo_manager',
-            homepage='https://pypi.python.org/pypi/repo_manager',
+    def test_get_version_missing_project(self):
+        """Assert an AnityaPluginException is raised for projects that result in 404."""
+        project = models.Project(
+            name="repo_manager_fake",
+            homepage="https://pypi.org/project/repo_manager_fake/",
             backend=BACKEND,
         )
         self.session.add(project)
         self.session.commit()
 
-        project = model.Project(
-            name='fake',
-            homepage='https://pypi.python.org/pypi/repo_manager_fake',
-            backend=BACKEND,
+        self.assertRaises(
+            AnityaPluginException, backend.PypiBackend.get_version, project
         )
-        self.session.add(project)
-        self.session.commit()
-
-        project = model.Project(
-            name='chai',
-            homepage='https://pypi.python.org/pypi/chai',
-            backend=BACKEND,
-        )
-        self.session.add(project)
-        self.session.commit()
 
     def test_pypi_get_version(self):
-        """ Test the get_version function of the pypi backend. """
-        pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = '0.1.0'
-        obs = backend.PypiBackend.get_version(project)
-        self.assertEqual(obs, exp)
-
-        pid = 2
-        project = model.Project.get(self.session, pid)
-        self.assertRaises(
-            AnityaPluginException,
-            backend.PypiBackend.get_version,
-            project
+        """Test the get_version function of the pypi backend."""
+        project = models.Project(
+            name="chai", homepage="https://pypi.org/project/chai/", backend=BACKEND
         )
+        self.session.add(project)
+        self.session.commit()
 
-        pid = 3
-        project = model.Project.get(self.session, pid)
-        exp = '1.1.0'
         obs = backend.PypiBackend.get_version(project)
+        self.assertEqual(obs, "1.1.2")
+
+    def test_pypi_get_version_not_modified(self):
+        """Assert that not modified response is handled correctly"""
+        project = models.Project(
+            name="repo_manager",
+            homepage="https://pypi.org/project/repo_manager/",
+            backend=BACKEND,
+        )
+        self.session.add(project)
+        self.session.commit()
+        exp_url = "https://pypi.org/pypi/repo_manager/json"
+
+        with mock.patch("anitya.lib.backends.BaseBackend.call_url") as m_call:
+            m_call.return_value = mock.Mock(status_code=304)
+            versions = backend.PypiBackend.get_version(project)
+
+            m_call.assert_called_with(exp_url, last_change=None)
+            self.assertEqual(versions, None)
+
+    def test_get_version_url(self):
+        """
+        Assert that correct url is returned.
+        """
+        project = models.Project(
+            name="test", homepage="https://example.org", backend=BACKEND
+        )
+        exp = "https://pypi.org/pypi/test/json"
+
+        obs = backend.PypiBackend.get_version_url(project)
+
         self.assertEqual(obs, exp)
 
     def test_pypi_get_versions(self):
-        """ Test the get_versions function of the pypi backend. """
-        pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = ['0.1.0']
+        """Test the get_versions function of the pypi backend."""
+        project = models.Project(
+            name="repo_manager",
+            homepage="https://pypi.org/project/repo_manager/",
+            backend=BACKEND,
+        )
+        self.session.add(project)
+        self.session.commit()
+        exp = ["0.1.0"]
+
         obs = backend.PypiBackend.get_versions(project)
         self.assertEqual(obs, exp)
 
-        pid = 2
-        project = model.Project.get(self.session, pid)
-        self.assertRaises(
-            AnityaPluginException,
-            backend.PypiBackend.get_versions,
-            project
+    def test_pypi_get_versions_yanked(self):
+        """Test the get_versions function filters out yanked versions."""
+        project = models.Project(
+            name="nltk",
+            homepage="https://pypi.org/project/nltk/",
+            backend=BACKEND,
         )
+        self.session.add(project)
+        self.session.commit()
+        exp = ["3.7"]
 
-        pid = 3
-        project = model.Project.get(self.session, pid)
-        exp = [
-            '0.1.0', '0.1.1', '0.1.2', '0.1.3', '0.1.4', '0.1.5', '0.1.6',
-            '0.1.7', '0.1.9', '0.1.10', '0.1.11', '0.1.12', '0.1.13',
-            '0.1.14', '0.1.15', '0.1.16', '0.1.17', '0.1.18', '0.1.19',
-            '0.1.20', '0.1.21', '0.1.22', '0.1.23', '0.2.0', '0.2.1',
-            '0.2.2', '0.2.3', '0.2.4', '0.3.0', '0.3.1', '0.3.2', '0.3.3',
-            '0.3.5', '0.3.6', '0.3.7', '0.4.0', '0.4.1', '0.4.2', '0.4.3',
-            '0.4.4', '0.4.5', '0.4.6', '0.4.7', '0.4.8', '1.0.0', '1.0.1',
-            '1.1.0',
-        ]
-        obs = backend.PypiBackend.get_ordered_versions(project)
+        obs = backend.PypiBackend.get_versions(project)
         self.assertEqual(obs, exp)
 
+    def test_pypi_get_versions_no_releases(self):
+        """Assert that JSON response with no releases is handled correctly"""
+        project = models.Project(
+            name="repo_manager",
+            homepage="https://pypi.org/project/repo_manager/",
+            backend=BACKEND,
+        )
+        self.session.add(project)
+        self.session.commit()
+        exp_url = "https://pypi.org/pypi/repo_manager/json"
+
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {}
+
+        with mock.patch("anitya.lib.backends.BaseBackend.call_url") as m_call:
+            m_call.return_value = mock_response
+            versions = backend.PypiBackend.get_versions(project)
+
+            m_call.assert_called_with(exp_url, last_change=None)
+            self.assertEqual(versions, [])
+
+    def test_pypi_get_versions_not_modified(self):
+        """Assert that not modified response is handled correctly"""
+        project = models.Project(
+            name="repo_manager",
+            homepage="https://pypi.org/project/repo_manager/",
+            backend=BACKEND,
+        )
+        self.session.add(project)
+        self.session.commit()
+        exp_url = "https://pypi.org/pypi/repo_manager/json"
+
+        with mock.patch("anitya.lib.backends.BaseBackend.call_url") as m_call:
+            m_call.return_value = mock.Mock(status_code=304)
+            versions = backend.PypiBackend.get_versions(project)
+
+            m_call.assert_called_with(exp_url, last_change=None)
+            self.assertEqual(versions, [])
+
     def test_pypi_check_feed(self):
-        """ Test the check_feed method of the pypi backend. """
+        """Test the check_feed method of the pypi backend."""
         generator = backend.PypiBackend.check_feed()
         items = list(generator)
 
-        self.assertEqual(items[0], (
-            'mkbrutus', 'https://pypi.python.org/pypi/mkbrutus',
-            'PyPI', '1.0.2a1'))
-        self.assertEqual(items[1], (
-            'ansible-lint', 'https://pypi.python.org/pypi/ansible-lint',
-            'PyPI', '3.0.0rc6'))
-        # etc...
-
-
-if __name__ == '__main__':
-    SUITE = unittest.TestLoader().loadTestsFromTestCase(PypiBackendtests)
-    unittest.TextTestRunner(verbosity=2).run(SUITE)
+        self.assertEqual(
+            items[0],
+            ("simplemdx", "https://pypi.org/project/simplemdx/", "PyPI", "0.1.2"),
+        )
+        self.assertEqual(
+            items[1],
+            (
+                "tapioca-trustwave-appscanner",
+                "https://pypi.org/project/tapioca-trustwave-appscanner/",
+                "PyPI",
+                "0.3",
+            ),
+        )

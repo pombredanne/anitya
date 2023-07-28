@@ -19,108 +19,171 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 anitya tests for the custom backend.
-'''
+"""
 
 import unittest
 
 import anitya.lib.backends.custom as backend
-import anitya.lib.model as model
+from anitya.db import models
 from anitya.lib.exceptions import AnityaPluginException
-from anitya.tests.base import Modeltests, create_distro, skip_jenkins
+from anitya.tests.base import DatabaseTestCase, create_distro
 
-BACKEND = 'custom'
+BACKEND = "custom"
 
 
-class CustomBackendtests(Modeltests):
-    """ custom backend tests. """
+class CustomBackendtests(DatabaseTestCase):
+    """custom backend tests."""
 
-    @skip_jenkins
     def setUp(self):
-        """ Set up the environnment, ran before every tests. """
-        super(CustomBackendtests, self).setUp()
+        """Set up the environnment, ran before every tests."""
+        super().setUp()
 
         create_distro(self.session)
         self.create_project()
 
     def create_project(self):
-        """ Create some basic projects to work with. """
-        project = model.Project(
-            name='geany',
-            homepage='http://www.geany.org/',
-            version_url='http://www.geany.org/Download/Releases',
-            regex='DEFAULT',
+        """Create some basic projects to work with."""
+        project = models.Project(
+            name="geany",
+            homepage="https://www.geany.org/",
+            version_url="https://www.geany.org/Download/Releases",
+            regex="DEFAULT",
             backend=BACKEND,
         )
         self.session.add(project)
         self.session.commit()
 
-        project = model.Project(
-            name='fake',
-            homepage='https://pypi.python.org/pypi/repo_manager_fake',
-            regex='DEFAULT',
+        project = models.Project(
+            name="fake",
+            homepage="https://pypi.python.org/pypi/repo_manager_fake",
+            regex="DEFAULT",
             backend=BACKEND,
         )
         self.session.add(project)
         self.session.commit()
 
-        project = model.Project(
-            name='subsurface',
-            homepage='http://subsurface.hohndel.org/',
-            version_url='http://subsurface.hohndel.org/downloads/',
-            regex='DEFAULT',
+        project = models.Project(
+            name="subsurface",
+            homepage="https://subsurface-divelog.org/",
+            version_url="https://subsurface-divelog.org/downloads/",
+            regex="DEFAULT",
             backend=BACKEND,
         )
         self.session.add(project)
         self.session.commit()
 
     def test_custom_get_version(self):
-        """ Test the get_version function of the custom backend. """
+        """Test the get_version function of the custom backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = '1.24.1'
+        project = models.Project.get(self.session, pid)
+        exp = "1.33"
         obs = backend.CustomBackend.get_version(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.CustomBackend.get_version,
-            project
+            AnityaPluginException, backend.CustomBackend.get_version, project
         )
 
         pid = 3
-        project = model.Project.get(self.session, pid)
-        exp = '4.4.2'
+        project = models.Project.get(self.session, pid)
+        exp = "4.7.7"
         obs = backend.CustomBackend.get_version(project)
+        self.assertEqual(obs, exp)
+
+    def test_get_version_url(self):
+        """Assert that correct url is returned."""
+        project = models.Project(
+            name="test",
+            homepage="http://example.org",
+            version_url="http://example.org/releases",
+            backend=BACKEND,
+        )
+        exp = project.version_url
+
+        obs = backend.CustomBackend.get_version_url(project)
+
         self.assertEqual(obs, exp)
 
     def test_custom_get_versions(self):
-        """ Test the get_versions function of the custom backend. """
+        """Test the get_versions function of the custom backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = ['1.24.1']
+        project = models.Project.get(self.session, pid)
+        exp = ["1.33"]
         obs = backend.CustomBackend.get_versions(project)
-        self.assertEqual(obs, exp)
+        self.assertEqual(sorted(obs), exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.CustomBackend.get_version,
-            project
+            AnityaPluginException, backend.CustomBackend.get_version, project
         )
 
         pid = 3
-        project = model.Project.get(self.session, pid)
-        exp = [u'3.1.1', u'4.0', u'4.0.1', u'4.0.2', u'4.0.3',
-               u'4.1', u'4.2', u'4.3', u'4.4.0', u'4.4.1', u'4.4.2']
+        project = models.Project.get(self.session, pid)
+        exp = [
+            "3.1.1",
+            "4.0",
+            "4.0.1",
+            "4.0.2",
+            "4.0.3",
+            "4.1",
+            "4.2",
+            "4.3",
+            "4.4.0",
+            "4.4.1",
+            "4.4.2",
+            "4.5.0",
+            "4.5.1",
+            "4.5.2",
+            "4.5.3",
+            "4.5.4",
+            "4.5.5",
+            "4.5.6",
+            "4.6.0",
+            "4.6.1",
+            "4.6.2",
+            "4.6.3",
+            "4.6.4",
+            "4.7.1",
+            "4.7.2",
+            "4.7.3",
+            "4.7.4",
+            "4.7.5",
+            "4.7.6",
+            "4.7.7",
+        ]
         obs = backend.CustomBackend.get_ordered_versions(project)
-        self.assertEqual(obs, exp)
+        self.assertEqual(sorted(obs), exp)
+
+    def test_custom_get_versions_unstable(self):
+        """
+        Assert that custom backend now also matches unstable versions of project.
+        Test for https://github.com/fedora-infra/anitya/issues/1063
+        """
+        project = models.Project(
+            name="grub",
+            homepage="https://www.gnu.org/software/grub/",
+            version_url="https://git.savannah.gnu.org/cgit/grub.git",
+            regex="DEFAULT",
+            backend=BACKEND,
+        )
+        exp = [
+            "2.02",
+            "2.02-beta3",
+            "2.02-rc1",
+            "2.02-rc2",
+            "2.04",
+            "2.04-rc1",
+            "2.06-rc1",
+        ]
+        obs = backend.CustomBackend.get_ordered_versions(project)
+        self.assertEqual(sorted(obs), exp)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     SUITE = unittest.TestLoader().loadTestsFromTestCase(CustomBackendtests)
     unittest.TextTestRunner(verbosity=2).run(SUITE)

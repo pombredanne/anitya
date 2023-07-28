@@ -1,68 +1,36 @@
 # -*- coding: utf-8 -*-
 
-from dateutil import parser
-from math import ceil
+""" Module anitya.admin """
 import logging
+from math import ceil
 
 import flask
-from sqlalchemy.exc import SQLAlchemyError
+from dateutil import parser
 
 import anitya
 import anitya.forms
-import anitya.lib.model
-
-from anitya.app import APP, SESSION, login_required, is_admin
-
+from anitya.db import Session, models
+from anitya.lib import utilities
+from anitya.ui import login_required, ui_blueprint
 
 _log = logging.getLogger(__name__)
 
 
-@APP.route('/distro/add', methods=['GET', 'POST'])
-@login_required
-def add_distro():
-
-    if not is_admin():
-        flask.abort(401)
-
-    form = anitya.forms.DistroForm()
-
-    if form.validate_on_submit():
-        name = form.name.data
-
-        distro = anitya.lib.model.Distro(name)
-
-        anitya.log(
-            SESSION,
-            distro=distro,
-            topic='distro.add',
-            message=dict(
-                agent=flask.g.auth.openid,
-                distro=distro.name,
-            )
-        )
-
-        try:
-            SESSION.add(distro)
-            SESSION.commit()
-            flask.flash('Distribution added')
-        except SQLAlchemyError:
-            flask.flash(
-                'Could not add this distro, already exists?', 'error')
-        return flask.redirect(
-            flask.url_for('distros')
-        )
-
-    return flask.render_template(
-        'distro_add.html',
-        current='distros',
-        form=form)
+def is_admin(user=None):
+    """Check if the provided user, or the user logged in are recognized
+    as being admins.
+    """
+    user = user or flask.g.user
+    if user.is_authenticated:
+        return user.is_admin
+    return False
 
 
-@APP.route('/distro/<distro_name>/edit', methods=['GET', 'POST'])
+@ui_blueprint.route("/distro/<distro_name>/edit", methods=["GET", "POST"])
 @login_required
 def edit_distro(distro_name):
-
-    distro = anitya.lib.model.Distro.by_name(SESSION, distro_name)
+    """Edit distribution"""
+    distro = models.Distro.by_name(Session, distro_name)
     if not distro:
         flask.abort(404)
 
@@ -75,40 +43,35 @@ def edit_distro(distro_name):
         name = form.name.data
 
         if name != distro.name:
-            anitya.log(
-                SESSION,
-                distro=distro,
-                topic='distro.edit',
-                message=dict(
-                    agent=flask.g.auth.openid,
-                    old=distro.name,
-                    new=name,
-                )
+            utilities.publish_message(
+                distro=distro.__json__(),
+                topic="distro.edit",
+                message=dict(agent=flask.g.user.username, old=distro.name, new=name),
             )
 
             distro.name = name
 
-            SESSION.add(distro)
-            SESSION.commit()
-            message = 'Distribution edited'
+            Session.add(distro)
+            Session.commit()
+            message = "Distribution edited"
             flask.flash(message)
-        return flask.redirect(
-            flask.url_for('distros')
-        )
+        return flask.redirect(flask.url_for("anitya_ui.distros"))
 
     return flask.render_template(
-        'distro_edit.html',
-        current='distros',
+        "distro_add_edit.html",
+        context="Edit",
+        current="distros",
         distro=distro,
-        form=form)
+        form=form,
+    )
 
 
-@APP.route('/distro/<distro_name>/delete', methods=['GET', 'POST'])
+@ui_blueprint.route("/distro/<distro_name>/delete", methods=["GET", "POST"])
 @login_required
 def delete_distro(distro_name):
-    """ Delete a distro """
+    """Delete a distro"""
 
-    distro = anitya.lib.model.Distro.by_name(SESSION, distro_name)
+    distro = models.Distro.by_name(Session, distro_name)
     if not distro:
         flask.abort(404)
 
@@ -118,33 +81,27 @@ def delete_distro(distro_name):
     form = anitya.forms.ConfirmationForm()
 
     if form.validate_on_submit():
-        anitya.log(
-            SESSION,
-            distro=distro,
-            topic='distro.remove',
-            message=dict(
-                agent=flask.g.auth.openid,
-                distro=distro.name,
-            )
+        utilities.publish_message(
+            distro=distro.__json__(),
+            topic="distro.remove",
+            message=dict(agent=flask.g.user.username, distro=distro.name),
         )
 
-        SESSION.delete(distro)
-        SESSION.commit()
-        flask.flash('Distro %s has been removed' % distro_name)
-        return flask.redirect(flask.url_for('distros'))
+        Session.delete(distro)
+        Session.commit()
+        flask.flash(f"Distro {distro_name} has been removed")
+        return flask.redirect(flask.url_for("anitya_ui.distros"))
 
     return flask.render_template(
-        'distro_delete.html',
-        current='distros',
-        distro=distro,
-        form=form)
+        "distro_delete.html", current="distros", distro=distro, form=form
+    )
 
 
-@APP.route('/project/<project_id>/delete', methods=['GET', 'POST'])
+@ui_blueprint.route("/project/<project_id>/delete", methods=["GET", "POST"])
 @login_required
 def delete_project(project_id):
-
-    project = anitya.lib.model.Project.get(SESSION, project_id)
+    """Delete project"""
+    project = models.Project.get(Session, project_id)
     if not project:
         flask.abort(404)
 
@@ -154,54 +111,110 @@ def delete_project(project_id):
     project_name = project.name
 
     form = anitya.forms.ConfirmationForm()
-    confirm = flask.request.form.get('confirm', False)
+    confirm = flask.request.form.get("confirm", False)
 
     if form.validate_on_submit():
         if confirm:
-            anitya.log(
-                SESSION,
-                project=project,
-                topic='project.remove',
-                message=dict(
-                    agent=flask.g.auth.openid,
-                    project=project.name,
-                )
+            utilities.publish_message(
+                project=project.__json__(),
+                topic="project.remove",
+                message=dict(agent=flask.g.user.username, project=project.name),
             )
 
             for version in project.versions_obj:
-                SESSION.delete(version)
+                Session.delete(version)
 
-            SESSION.delete(project)
-            SESSION.commit()
-            flask.flash('Project %s has been removed' % project_name)
-            return flask.redirect(flask.url_for('projects'))
+            Session.delete(project)
+            Session.commit()
+            flask.flash(f"Project {project_name} has been removed")
+            return flask.redirect(flask.url_for("anitya_ui.projects"))
         else:
             return flask.redirect(
-                flask.url_for('project', project_id=project.id))
+                flask.url_for("anitya_ui.project", project_id=project.id)
+            )
 
     return flask.render_template(
-        'project_delete.html',
-        current='projects',
-        project=project,
-        form=form)
+        "project_delete.html", current="projects", project=project, form=form
+    )
 
 
-@APP.route(
-    '/project/<project_id>/delete/<distro_name>/<pkg_name>',
-    methods=['GET', 'POST'])
+@ui_blueprint.route(
+    "/project/<project_id>/archive/set/<state>", methods=["GET", "POST"]
+)
 @login_required
-def delete_project_mapping(project_id, distro_name, pkg_name):
+def set_project_archive_state(project_id, state):
+    """Set project archive state"""
+    if not is_admin():
+        flask.abort(401)
 
-    project = anitya.lib.model.Project.get(SESSION, project_id)
+    if state not in ("true", "false"):
+        flask.abort(422)
+
+    project = models.Project.get(Session, project_id)
+    archive = False
+    if state == "true":
+        archive = True
+
     if not project:
         flask.abort(404)
 
-    distro = anitya.lib.model.Distro.get(SESSION, distro_name)
+    form = anitya.forms.ConfirmationForm()
+    confirm = flask.request.form.get("confirm", False)
+
+    if form.validate_on_submit():
+        if confirm:
+            try:
+                utilities.edit_project(
+                    Session,
+                    project=project,
+                    name=project.name,
+                    homepage=project.homepage,
+                    backend=project.backend,
+                    version_scheme=project.version_scheme,
+                    version_pattern=project.version_pattern,
+                    version_url=project.version_url,
+                    version_prefix=project.version_prefix,
+                    pre_release_filter=project.pre_release_filter,
+                    version_filter=project.pre_release_filter,
+                    regex=project.regex,
+                    insecure=project.insecure,
+                    releases_only=project.releases_only,
+                    archived=archive,
+                    user_id=flask.g.user.username,
+                )
+                if bool(archive):
+                    flask.flash(f"Project '{project.name}' archived")
+                else:
+                    flask.flash(f"Project '{project.name}' is no longer archived")
+            except anitya.lib.exceptions.AnityaException as err:
+                flask.flash(str(err), "errors")
+
+        return flask.redirect(flask.url_for("anitya_ui.project", project_id=project.id))
+
+    return flask.render_template(
+        "project_archive.html",
+        current="projects",
+        project=project,
+        form=form,
+        archive=archive,
+    )
+
+
+@ui_blueprint.route(
+    "/project/<project_id>/delete/<distro_name>/<pkg_name>", methods=["GET", "POST"]
+)
+@login_required
+def delete_project_mapping(project_id, distro_name, pkg_name):
+    """Delete project mapping"""
+    project = models.Project.get(Session, project_id)
+    if not project:
+        flask.abort(404)
+
+    distro = models.Distro.get(Session, distro_name)
     if not distro:
         flask.abort(404)
 
-    package = anitya.lib.model.Packages.get(
-        SESSION, project.id, distro.name, pkg_name)
+    package = models.Packages.get(Session, project.id, distro.name, pkg_name)
     if not package:
         flask.abort(404)
 
@@ -209,42 +222,40 @@ def delete_project_mapping(project_id, distro_name, pkg_name):
         flask.abort(401)
 
     form = anitya.forms.ConfirmationForm()
-    confirm = flask.request.form.get('confirm', False)
+    confirm = flask.request.form.get("confirm", False)
 
     if form.validate_on_submit():
         if confirm:
-            anitya.log(
-                SESSION,
-                project=project,
-                topic='project.map.remove',
+            utilities.publish_message(
+                project=project.__json__(),
+                topic="project.map.remove",
                 message=dict(
-                    agent=flask.g.auth.openid,
+                    agent=flask.g.user.username,
                     project=project.name,
                     distro=distro.name,
-                )
+                ),
             )
 
-            SESSION.delete(package)
-            SESSION.commit()
+            Session.delete(package)
+            Session.commit()
 
-            flask.flash('Mapping for %s has been removed' % project.name)
-        return flask.redirect(
-            flask.url_for('project', project_id=project.id))
+            flask.flash(f"Mapping for {project.name} has been removed")
+        return flask.redirect(flask.url_for("anitya_ui.project", project_id=project.id))
 
     return flask.render_template(
-        'regex_delete.html',
-        current='projects',
+        "regex_delete.html",
+        current="projects",
         project=project,
         package=package,
-        form=form)
+        form=form,
+    )
 
 
-@APP.route(
-    '/project/<project_id>/delete/<version>', methods=['GET', 'POST'])
+@ui_blueprint.route("/project/<project_id>/delete/<version>", methods=["GET", "POST"])
 @login_required
 def delete_project_version(project_id, version):
-
-    project = anitya.lib.model.Project.get(SESSION, project_id)
+    """Delect project version"""
+    project = models.Project.get(Session, project_id)
     if not project:
         flask.abort(404)
 
@@ -255,143 +266,116 @@ def delete_project_version(project_id, version):
             break
 
     if version_obj is None:
-        flask.abort(
-            404,
-            'Version %s not found for project %s' % (version, project.name)
-        )
+        flask.abort(404, f"Version {version} not found for project {project.name}")
 
     if not is_admin():
         flask.abort(401)
 
     form = anitya.forms.ConfirmationForm()
-    confirm = flask.request.form.get('confirm', False)
+    confirm = flask.request.form.get("confirm", False)
 
     if form.validate_on_submit():
         if confirm:
-            anitya.log(
-                SESSION,
-                project=project,
-                topic='project.version.remove',
+            utilities.publish_message(
+                project=project.__json__(),
+                topic="project.version.remove.v2",
                 message=dict(
-                    agent=flask.g.auth.openid,
+                    agent=flask.g.user.username,
                     project=project.name,
-                    version=version,
-                )
+                    versions=[version],
+                ),
             )
 
             # Delete the record of the version for this project
-            SESSION.delete(version_obj)
+            Session.delete(version_obj)
             # Adjust the latest_version if needed
-            if project.latest_version == version:
+            sorted_versions = project.get_sorted_version_objects()
+            if len(sorted_versions) > 1 and sorted_versions[0].version == version:
+                project.latest_version = sorted_versions[1].parse()
+                Session.add(project)
+            elif len(sorted_versions) == 1:
                 project.latest_version = None
-                SESSION.add(project)
-            SESSION.commit()
+                Session.add(project)
+            Session.commit()
 
-            flask.flash('Version for %s has been removed' % version)
-        return flask.redirect(
-            flask.url_for('project', project_id=project.id))
+            flask.flash(f"Version for {version} has been removed")
+        return flask.redirect(flask.url_for("anitya_ui.project", project_id=project.id))
 
     return flask.render_template(
-        'version_delete.html',
-        current='projects',
+        "version_delete.html",
+        current="projects",
         project=project,
         version=version,
-        form=form)
-
-
-@APP.route('/logs')
-@login_required
-def browse_logs():
-
-    if is_admin():
-        user = flask.request.args.get('user', None)
-    else:
-        user = [flask.g.auth.openid, flask.g.auth.email]
-
-    from_date = flask.request.args.get('from_date', None)
-    project = flask.request.args.get('project', None)
-    refresh = flask.request.args.get('refresh', False)
-    limit = flask.request.args.get('limit', 50)
-    page = flask.request.args.get('page', 1)
-
-    try:
-        page = int(page)
-    except ValueError:
-        page = 1
-
-    try:
-        int(limit)
-    except ValueError:
-        limit = 50
-        flask.flash('Incorrect limit provided, using default', 'errors')
-
-    if from_date:
-        try:
-            from_date = parser.parse(from_date)
-        except (ValueError, TypeError):
-            flask.flash(
-                'Incorrect from_date provided, using default', 'errors')
-            from_date = None
-
-    if from_date:
-        from_date = from_date.date()
-
-    offset = 0
-    if page is not None and limit is not None and limit != 0:
-        offset = (page - 1) * limit
-
-    logs = []
-    try:
-        logs = anitya.lib.model.Log.search(
-            SESSION,
-            project_name=project or None,
-            from_date=from_date,
-            user=user or None,
-            offset=offset,
-            limit=limit,
-        )
-
-        cnt_logs = anitya.lib.model.Log.search(
-            SESSION,
-            project_name=project or None,
-            from_date=from_date,
-            user=user or None,
-            count=True
-        )
-    except Exception as err:
-        _log.exception(err)
-        flask.flash(err, 'errors')
-
-    total_page = int(ceil(cnt_logs / float(limit)))
-
-    return flask.render_template(
-        'logs.html',
-        current='logs',
-        refresh=refresh,
-        logs=logs,
-        cnt_logs=cnt_logs,
-        total_page=total_page,
-        page=page,
-        project=project or '',
-        from_date=from_date or '',
-        user=user or ''
+        form=form,
     )
 
 
-@APP.route('/flags')
+@ui_blueprint.route("/project/<project_id>/delete/versions", methods=["GET", "POST"])
 @login_required
-def browse_flags():
+def delete_project_versions(project_id):
+    """
+    Delete all versions on the project.
+    """
+
+    project = models.Project.get(Session, project_id)
+    if not project:
+        flask.abort(404)
 
     if not is_admin():
         flask.abort(401)
 
-    from_date = flask.request.args.get('from_date', None)
-    state = flask.request.args.get('state', 'open')
-    project = flask.request.args.get('project', None)
-    user = flask.request.args.get('user', None)
-    refresh = flask.request.args.get('refresh', False)
-    limit = flask.request.args.get('limit', 50)
-    page = flask.request.args.get('page', 1)
+    form = anitya.forms.ConfirmationForm()
+    confirm = flask.request.form.get("confirm", False)
+
+    if form.validate_on_submit():
+        if confirm:
+            versions = []
+
+            # Delete the versions on this project
+            for version in project.versions_obj:
+                Session.delete(version)
+                versions.append(str(version))
+
+            project.latest_version = None
+
+            utilities.publish_message(
+                project=project.__json__(),
+                topic="project.version.remove.v2",
+                message=dict(
+                    agent=flask.g.user.username,
+                    project=project.name,
+                    versions=versions,
+                ),
+            )
+
+            Session.add(project)
+            Session.commit()
+
+            flask.flash("All versions were removed")
+        return flask.redirect(flask.url_for("anitya_ui.project", project_id=project.id))
+
+    return flask.render_template(
+        "project_versions_delete.html",
+        current="projects",
+        project=project,
+        form=form,
+    )
+
+
+@ui_blueprint.route("/flags")
+@login_required
+def browse_flags():
+    """Brows flags"""
+    if not is_admin():
+        flask.abort(401)
+
+    from_date = flask.request.args.get("from_date", None)
+    state = flask.request.args.get("state", "open")
+    project = flask.request.args.get("project", None)
+    flags_for_user = flask.request.args.get("user", None)
+    refresh = flask.request.args.get("refresh", False)
+    limit = flask.request.args.get("limit", 50)
+    page = flask.request.args.get("page", 1)
 
     try:
         page = int(page)
@@ -402,14 +386,13 @@ def browse_flags():
         int(limit)
     except ValueError:
         limit = 50
-        flask.flash('Incorrect limit provided, using default', 'errors')
+        flask.flash("Incorrect limit provided, using default", "errors")
 
     if from_date:
         try:
             from_date = parser.parse(from_date)
         except (ValueError, TypeError):
-            flask.flash(
-                'Incorrect from_date provided, using default', 'errors')
+            flask.flash("Incorrect from_date provided, using default", "errors")
             from_date = None
 
     if from_date:
@@ -422,59 +405,59 @@ def browse_flags():
     flags = []
 
     try:
-        flags = anitya.lib.model.ProjectFlag.search(
-            SESSION,
+        flags = models.ProjectFlag.search(
+            Session,
             project_name=project or None,
             state=state or None,
             from_date=from_date,
-            user=user or None,
+            user=flags_for_user or None,
             offset=offset,
             limit=limit,
         )
 
-        cnt_flags = anitya.lib.model.ProjectFlag.search(
-            SESSION,
+        cnt_flags = models.ProjectFlag.search(
+            Session,
             project_name=project or None,
             state=state or None,
             from_date=from_date,
-            user=user or None,
-            count=True
+            user=flags_for_user or None,
+            count=True,
         )
     except Exception as err:
         _log.exception(err)
-        flask.flash(err, 'errors')
+        flask.flash(err, "errors")
 
     total_page = int(ceil(cnt_flags / float(limit)))
 
     form = anitya.forms.ConfirmationForm()
 
     return flask.render_template(
-        'flags.html',
-        current='flags',
+        "flags.html",
+        current="flags",
         refresh=refresh,
         flags=flags,
         cnt_flags=cnt_flags,
         total_page=total_page,
         form=form,
         page=page,
-        project=project or '',
-        from_date=from_date or '',
-        user=user or '',
-        state=state or ''
+        project=project or "",
+        from_date=from_date or "",
+        flags_for_user=flags_for_user or "",
+        state=state or "",
     )
 
 
-@APP.route('/flags/<flag_id>/set/<state>', methods=['POST'])
+@ui_blueprint.route("/flags/<flag_id>/set/<state>", methods=["POST"])
 @login_required
 def set_flag_state(flag_id, state):
-
+    """Set flag state"""
     if not is_admin():
         flask.abort(401)
 
-    if state not in ('open', 'closed'):
+    if state not in ("open", "closed"):
         flask.abort(422)
 
-    flag = anitya.lib.model.ProjectFlag.get(SESSION, flag_id)
+    flag = models.ProjectFlag.get(Session, flag_id)
 
     if not flag:
         flask.abort(404)
@@ -483,16 +466,195 @@ def set_flag_state(flag_id, state):
 
     if form.validate_on_submit():
         try:
-            anitya.lib.set_flag_state(
-                SESSION,
-                flag=flag,
-                state=state,
-                user_id=flask.g.auth.openid,
+            utilities.set_flag_state(
+                Session, flag=flag, state=state, user_id=flask.g.user.username
             )
-            flask.flash('Flag {0} set to {1}'.format(flag.id, state))
+            flask.flash(f"Flag {flag.id} set to {state}")
         except anitya.lib.exceptions.AnityaException as err:
-            flask.flash(str(err), 'errors')
+            flask.flash(str(err), "errors")
 
-    return flask.redirect(
-        flask.url_for('browse_flags')
+    return flask.redirect(flask.url_for("anitya_ui.browse_flags"))
+
+
+@ui_blueprint.route("/users", methods=["GET"])
+@login_required
+def browse_users():
+    """Browse users"""
+    if not is_admin():
+        flask.abort(401)
+
+    user_id = flask.request.args.get("user_id", None)
+    username = flask.request.args.get("username", None)
+    email = flask.request.args.get("email", None)
+    admin = flask.request.args.get("admin", None)
+    active = flask.request.args.get("active", None)
+    limit = flask.request.args.get("limit", 50)
+    page = flask.request.args.get("page", 1)
+
+    try:
+        page = int(page)
+    except ValueError:
+        page = 1
+
+    if admin:
+        if admin.upper() == "TRUE":
+            admin = True
+        elif admin.upper() == "FALSE":
+            admin = False
+        else:
+            admin = None
+
+    if active:
+        if active.upper() == "TRUE":
+            active = True
+        elif active.upper() == "FALSE":
+            active = False
+        else:
+            active = None
+
+    try:
+        limit = int(limit)
+    except ValueError:
+        limit = 50
+        flask.flash("Incorrect limit provided, using default", "errors")
+
+    offset = 0
+    if page is not None and limit is not None and limit > 0:
+        offset = (page - 1) * limit
+
+    users = []
+    cnt_users = 0
+    try:
+        users_query = Session.query(models.User)
+
+        if user_id:
+            users_query = users_query.filter_by(id=user_id)
+
+        if username:
+            users_query = users_query.filter_by(username=username)
+
+        if email:
+            users_query = users_query.filter_by(email=email)
+
+        if admin is not None:
+            users_query = users_query.filter_by(admin=admin)
+
+        if active is not None:
+            users_query = users_query.filter_by(active=active)
+
+        if offset > 0:
+            users_query = users_query.offset(offset)
+        if limit > 0:
+            users_query = users_query.limit(limit)
+
+        users = users_query.all()
+        cnt_users = users_query.count()
+    except Exception as err:
+        _log.exception(err)
+        flask.flash(err, "errors")
+
+    try:
+        total_page = int(ceil(cnt_users / float(limit)))
+    except ZeroDivisionError:
+        total_page = 1
+
+    form = anitya.forms.ConfirmationForm()
+
+    return flask.render_template(
+        "users.html",
+        current="users",
+        users=users,
+        cnt_users=cnt_users,
+        total_page=total_page,
+        form=form,
+        page=page,
+        username=username or "",
+        email=email or "",
+        user_id=user_id or "",
+        admin=admin,
+        active=active,
     )
+
+
+@ui_blueprint.route("/users/<user_id>/admin/<state>", methods=["POST"])
+@login_required
+def set_user_admin_state(user_id, state):
+    """Set user admin state"""
+    if not is_admin():
+        flask.abort(401)
+
+    if state.upper() == "TRUE":
+        state = True
+    elif state.upper() == "FALSE":
+        state = False
+    else:
+        flask.abort(422)
+
+    try:
+        user = Session.query(models.User).filter(models.User.id == user_id).one()
+    except Exception as err:
+        _log.exception(err)
+        user = None
+
+    if not user:
+        flask.abort(404)
+
+    form = anitya.forms.ConfirmationForm()
+
+    if form.validate_on_submit():
+        try:
+            user.admin = state
+            Session.add(user)
+            Session.commit()
+            if state:
+                flask.flash(f"User {user.username} is now admin")
+            else:
+                flask.flash(f"User {user.username} is not admin anymore")
+        except Exception as err:
+            _log.exception(err)
+            flask.flash(str(err), "errors")
+            Session.rollback()
+
+    return flask.redirect(flask.url_for("anitya_ui.browse_users"))
+
+
+@ui_blueprint.route("/users/<user_id>/active/<state>", methods=["POST"])
+@login_required
+def set_user_active_state(user_id, state):
+    """Set user active state"""
+    if not is_admin():
+        flask.abort(401)
+
+    if state.upper() == "TRUE":
+        state = True
+    elif state.upper() == "FALSE":
+        state = False
+    else:
+        flask.abort(422)
+
+    try:
+        user = Session.query(models.User).filter(models.User.id == user_id).one()
+    except Exception as err:
+        _log.exception(err)
+        user = None
+
+    if not user:
+        flask.abort(404)
+
+    form = anitya.forms.ConfirmationForm()
+
+    if form.validate_on_submit():
+        try:
+            user.active = state
+            Session.add(user)
+            Session.commit()
+            if state:
+                flask.flash(f"User {user.username} is no longer banned")
+            else:
+                flask.flash(f"User {user.username} is banned")
+        except Exception as err:
+            _log.exception(err)
+            flask.flash(str(err), "errors")
+            Session.rollback()
+
+    return flask.redirect(flask.url_for("anitya_ui.browse_users"))

@@ -19,94 +19,111 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 anitya tests for the debian backend.
-'''
+"""
 
 import unittest
 
-import mock
-
-from anitya.lib.exceptions import AnityaPluginException
-from anitya.lib.backends import get_versions_by_regex_for_text
-from anitya.tests.base import Modeltests, create_distro, skip_jenkins
 import anitya.lib.backends.debian as backend
-import anitya.lib.model as model
+from anitya.db import models
+from anitya.lib.backends import get_versions_by_regex_for_text
+from anitya.lib.exceptions import AnityaPluginException
+from anitya.tests.base import DatabaseTestCase, create_distro
+
+BACKEND = "Debian project"
 
 
-BACKEND = 'Debian project'
+class DebianBackendtests(DatabaseTestCase):
+    """Debian backend tests."""
 
-
-class DebianBackendtests(Modeltests):
-    """ Debian backend tests. """
-
-    @skip_jenkins
     def setUp(self):
-        """ Set up the environnment, ran before every tests. """
-        super(DebianBackendtests, self).setUp()
+        """Set up the environnment, ran before every tests."""
+        super().setUp()
 
         create_distro(self.session)
         self.create_project()
 
     def create_project(self):
-        """ Create some basic projects to work with. """
-        project = model.Project(
-            name='guake',
-            homepage='http://ftp.debian.org/debian/pool/main/g/guake/',
+        """Create some basic projects to work with."""
+        project = models.Project(
+            name="guake",
+            homepage="http://ftp.debian.org/debian/pool/main/g/guake/",
             backend=BACKEND,
         )
         self.session.add(project)
         self.session.commit()
 
-        project = model.Project(
-            name='foo',
-            homepage='http://pecl.php.net/package/foo',
-            backend=BACKEND,
+        project = models.Project(
+            name="foo", homepage="https://pecl.php.net/package/foo", backend=BACKEND
         )
         self.session.add(project)
         self.session.commit()
 
-        project = model.Project(
-            name='libgnupg-interface-perl',
-            homepage='http://ftp.debian.org/debian/pool/main/'
-            'libg/libgnupg-interface-perl/',
+        project = models.Project(
+            name="libgnupg-interface-perl",
+            homepage="http://ftp.debian.org/debian/pool/main/"
+            "libg/libgnupg-interface-perl/",
             backend=BACKEND,
         )
         self.session.add(project)
         self.session.commit()
-
 
     def test_get_version(self):
-        """ Test the get_version function of the debian backend. """
+        """Test the get_version function of the debian backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = '0.7.2'
+        project = models.Project.get(self.session, pid)
+        exp = "0.7.2"
         obs = backend.DebianBackend.get_version(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.DebianBackend.get_version,
-            project
+            AnityaPluginException, backend.DebianBackend.get_version, project
         )
 
         pid = 3
-        project = model.Project.get(self.session, pid)
-        exp = '0.52'
+        project = models.Project.get(self.session, pid)
+        exp = "0.52"
         obs = backend.DebianBackend.get_version(project)
         self.assertEqual(obs, exp)
 
+    def test_get_version_url(self):
+        """Assert that correct url is returned."""
+        project = models.Project(
+            name="test",
+            homepage="http://example.org",
+            version_url="http://example.org/releases",
+            backend=BACKEND,
+        )
+        exp = "http://ftp.debian.org/debian/pool/main/t/test/"
+
+        obs = backend.DebianBackend.get_version_url(project)
+
+        self.assertEqual(obs, exp)
+
+    def test_get_version_url_lib_prefix(self):
+        """
+        Assert that correct url is returned when name contains lib prefix.
+        """
+        project = models.Project(
+            name="libtest",
+            homepage="http://example.org",
+            version_url="http://example.org/releases",
+            backend=BACKEND,
+        )
+        exp = "http://ftp.debian.org/debian/pool/main/libt/libtest/"
+
+        obs = backend.DebianBackend.get_version_url(project)
+
+        self.assertEqual(obs, exp)
+
     def test_get_versions(self):
-        """ Test the get_versions function of the debian backend. """
+        """Test the get_versions function of the debian backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = [
-            u'0.4.2', u'0.4.3', u'0.4.4',
-            u'0.5.0',
-            u'0.7.0', u'0.7.2',
-        ]
+        project = models.Project.get(self.session, pid)
+        exp = ["0.4.2", "0.4.3", "0.4.4", "0.5.0", "0.7.0", "0.7.2"]
         obs = backend.DebianBackend.get_ordered_versions(project)
         self.assertEqual(obs, exp)
 
@@ -115,18 +132,16 @@ class DebianBackendtests(Modeltests):
         Assert an exception is raised if the request results in a HTTP 404.
         """
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.DebianBackend.get_version,
-            project
+            AnityaPluginException, backend.DebianBackend.get_version, project
         )
 
     def test_get_versions_no_z_release(self):
         """Assert the Debian backend handles versions in the format X.Y"""
         pid = 3
-        project = model.Project.get(self.session, pid)
-        exp = [u'0.45', u'0.50', u'0.52']
+        project = models.Project.get(self.session, pid)
+        exp = ["0.45", "0.50", "0.52"]
         obs = backend.DebianBackend.get_ordered_versions(project)
         self.assertEqual(obs, exp)
 
@@ -140,11 +155,11 @@ class DebianBackendtests(Modeltests):
         """
         versions = get_versions_by_regex_for_text(
             tarball_names,
-            'http://example.com',
-            backend.DEBIAN_REGEX % {'name': 'libgnupg-interface-perl'},
-            model.Project.get(self.session, 3)
+            "https://example.com",
+            backend.DEBIAN_REGEX % {"name": "libgnupg-interface-perl"},
+            models.Project.get(self.session, 3),
         )
-        self.assertEqual(sorted(['0.45', '0.46']), sorted(versions))
+        self.assertEqual(sorted(["0.45", "0.46"]), sorted(versions))
 
     def test_debian_regex_without_orig(self):
         """Assert Debian tarballs without the ".orig" string work"""
@@ -156,13 +171,13 @@ class DebianBackendtests(Modeltests):
         """
         versions = get_versions_by_regex_for_text(
             tarball_names,
-            'http://example.com',
-            backend.DEBIAN_REGEX % {'name': 'libgnupg-interface-perl'},
-            model.Project.get(self.session, 3)
+            "https://example.com",
+            backend.DEBIAN_REGEX % {"name": "libgnupg-interface-perl"},
+            models.Project.get(self.session, 3),
         )
-        self.assertEqual(sorted(['0.45', '0.46']), sorted(versions))
+        self.assertEqual(sorted(["0.45", "0.46"]), sorted(versions))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     SUITE = unittest.TestLoader().loadTestsFromTestCase(DebianBackendtests)
     unittest.TextTestRunner(verbosity=2).run(SUITE)

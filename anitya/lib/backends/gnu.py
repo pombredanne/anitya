@@ -8,49 +8,47 @@
 
 """
 
-from anitya.lib.backends import (
-    BaseBackend, REGEX, get_versions_by_regex_for_text)
-from anitya.lib.exceptions import AnityaPluginException
+import six
 
+from anitya.lib.backends import REGEX, BaseBackend, get_versions_by_regex_for_text
+from anitya.lib.exceptions import AnityaPluginException
 
 DEFAULT_REGEX = 'href="([0-9][0-9.]*)/"'
 
 
 class GnuBackend(BaseBackend):
-    ''' The custom class for project hosted on gnu.org.
+    """The custom class for project hosted on gnu.org.
 
     This backend allows to specify a version_url and a regex that will
     be used to retrieve the version information.
-    '''
+    """
 
-    name = 'GNU project'
-    examples = [
-        'http://ftp.gnu.org/pub/gnu/gnash/',
-    ]
+    name = "GNU project"
+    examples = ["https://ftp.gnu.org/pub/gnu/gnash/"]
 
     @classmethod
-    def get_version(cls, project):
-        ''' Method called to retrieve the latest version of the projects
-        provided, project that relies on the backend of this plugin.
+    def get_version_url(cls, project):
+        """Method called to retrieve the url used to check for new version
+        of the project provided, project that relies on the backend of this plugin.
 
-        :arg Project project: a :class:`model.Project` object whose backend
-            corresponds to the current plugin.
-        :return: the latest version found upstream
-        :return type: str
-        :raise AnityaPluginException: a
-            :class:`anitya.lib.exceptions.AnityaPluginException` exception
-            when the version cannot be retrieved correctly
+        Attributes:
+            project (:obj:`anitya.db.models.Project`): Project object whose backend
+                corresponds to the current plugin.
 
-        '''
-        return cls.get_ordered_versions(project)[-1]
+        Returns:
+            str: url used for version checking
+        """
+        url = f"https://ftp.gnu.org/gnu/{project.name}/"
+
+        return url
 
     @classmethod
     def get_versions(cls, project):
-        ''' Method called to retrieve all the versions (that can be found)
+        """Method called to retrieve all the versions (that can be found)
         of the projects provided, project that relies on the backend of
         this plugin.
 
-        :arg Project project: a :class:`model.Project` object whose backend
+        :arg Project project: a :class:`anitya.db.models.Project` object whose backend
             corresponds to the current plugin.
         :return: a list of all the possible releases found
         :return type: list
@@ -58,22 +56,47 @@ class GnuBackend(BaseBackend):
             :class:`anitya.lib.exceptions.AnityaPluginException` exception
             when the versions cannot be retrieved correctly
 
-        '''
-        url = 'http://ftp.gnu.org/gnu/%(name)s/' % {'name': project.name}
+        """
+        url = cls.get_version_url(project)
+        last_change = project.get_time_last_created_version()
 
         try:
-            req = cls.call_url(url)
-        except Exception:  # pragma: no cover
+            req = cls.call_url(url, last_change=last_change)
+        except Exception as err:  # pragma: no cover
             raise AnityaPluginException(
-                'Could not call : "%s" of "%s"' % (url, project.name))
+                f'Could not call : "{url}" of "{project.name}"'
+            ) from err
 
-        versions = None
+        versions = []
+        if not isinstance(req, six.string_types):
+            # Not modified
+            if req.status_code == 304:
+                return versions
+
         try:
-            regex = REGEX % {'name': project.name}
-            versions = get_versions_by_regex_for_text(
-                req.text, url, regex, project)
+            regex = REGEX % {"name": project.name}
+            versions = get_versions_by_regex_for_text(req.text, url, regex, project)
         except AnityaPluginException:
             versions = get_versions_by_regex_for_text(
-                req.text, url, DEFAULT_REGEX, project)
+                req.text, url, DEFAULT_REGEX, project
+            )
 
         return versions
+
+    @classmethod
+    def check_feed(cls):  # pragma: no cover
+        """Method called to retrieve the latest uploads to a given backend,
+        via, for example, RSS or an API.
+
+        Not Supported
+
+        Returns:
+            :obj:`list`: A list of 4-tuples, containing the project name, homepage, the
+            backend, and the version.
+
+        Raises:
+             NotImplementedError: If backend does not
+                support batch updates.
+
+        """
+        raise NotImplementedError()

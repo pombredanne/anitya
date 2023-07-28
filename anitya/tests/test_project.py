@@ -19,116 +19,115 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 anitya tests for the Project object.
-'''
+"""
 
 import unittest
 
-import anitya.lib.model as model
-from anitya.tests.base import Modeltests, create_project
+from anitya.db import models
+from anitya.tests.base import DatabaseTestCase, create_project
 
 
-class Projecttests(Modeltests):
-    """ Project tests. """
+class Projecttests(DatabaseTestCase):
+    """Project tests."""
 
     def test_project_init(self):
-        """ Test the __init__ function of Project. """
+        """Test the __init__ function of Project."""
         create_project(self.session)
-        self.assertEqual(3, model.Project.all(self.session, count=True))
+        self.assertEqual(3, models.Project.all(self.session, count=True))
 
-        projects = model.Project.all(self.session)
-        self.assertEqual(projects[0].name, 'geany')
-        self.assertEqual(projects[1].name, 'R2spec')
-        self.assertEqual(projects[2].name, 'subsurface')
+        projects = models.Project.all(self.session)
+        self.assertEqual(projects[0].name, "geany")
+        self.assertEqual(projects[1].name, "R2spec")
+        self.assertEqual(projects[2].name, "subsurface")
 
     def test_project_by_name(self):
-        """ Test the by_name function of Project. """
+        """Test the by_name function of Project."""
         create_project(self.session)
 
-        project = model.Project.by_name(self.session, 'geany')
-        self.assertEqual(project[0].name, 'geany')
-        self.assertEqual(project[0].homepage, 'http://www.geany.org/')
+        project = models.Project.by_name(self.session, "geany")
+        self.assertEqual(project[0].name, "geany")
+        self.assertEqual(project[0].homepage, "https://www.geany.org/")
 
-        project = model.Project.by_name(self.session, 'terminal')
+        project = models.Project.by_name(self.session, "terminal")
         self.assertEqual(project, [])
 
     def test_project_by_id(self):
-        """ Test the by_id function of Project. """
+        """Test the by_id function of Project."""
         create_project(self.session)
 
-        project = model.Project.by_id(self.session, 1)
-        self.assertEqual(project.name, 'geany')
-        self.assertEqual(project.homepage, 'http://www.geany.org/')
+        project = models.Project.by_id(self.session, 1)
+        self.assertEqual(project.name, "geany")
+        self.assertEqual(project.homepage, "https://www.geany.org/")
 
-        project = model.Project.get(self.session, 1)
-        self.assertEqual(project.name, 'geany')
-        self.assertEqual(project.homepage, 'http://www.geany.org/')
+        project = models.Project.get(self.session, 1)
+        self.assertEqual(project.name, "geany")
+        self.assertEqual(project.homepage, "https://www.geany.org/")
 
-        project = model.Project.by_id(self.session, 2)
-        self.assertEqual(project.name, 'subsurface')
-        self.assertEqual(project.homepage, 'http://subsurface.hohndel.org/')
+        project = models.Project.by_id(self.session, 2)
+        self.assertEqual(project.name, "subsurface")
+        self.assertEqual(project.homepage, "https://subsurface-divelog.org/")
 
-        project = model.Project.get(self.session, 2)
-        self.assertEqual(project.name, 'subsurface')
-        self.assertEqual(project.homepage, 'http://subsurface.hohndel.org/')
+        project = models.Project.get(self.session, 2)
+        self.assertEqual(project.name, "subsurface")
+        self.assertEqual(project.homepage, "https://subsurface-divelog.org/")
 
-        project = model.Project.by_id(self.session, 10)
+        project = models.Project.by_id(self.session, 10)
         self.assertEqual(project, None)
 
     def test_project_by_homepage(self):
-        """ Test the by_homepage function of Project. """
+        """Test the by_homepage function of Project."""
         create_project(self.session)
 
-        projects = model.Project.by_homepage(
-            self.session, 'http://www.geany.org/')
+        projects = models.Project.by_homepage(self.session, "https://www.geany.org/")
         self.assertEqual(len(projects), 1)
-        self.assertEqual(projects[0].name, 'geany')
-        self.assertEqual(projects[0].homepage, 'http://www.geany.org/')
+        self.assertEqual(projects[0].name, "geany")
+        self.assertEqual(projects[0].homepage, "https://www.geany.org/")
 
-        projects = model.Project.by_homepage(
-            self.session, 'http://subsurface.hohndel.org/')
+        projects = models.Project.by_homepage(
+            self.session, "https://subsurface-divelog.org/"
+        )
         self.assertEqual(len(projects), 1)
-        self.assertEqual(projects[0].name, 'subsurface')
-        self.assertEqual(projects[0].homepage, 'http://subsurface.hohndel.org/')
+        self.assertEqual(projects[0].name, "subsurface")
+        self.assertEqual(projects[0].homepage, "https://subsurface-divelog.org/")
 
-        project = model.Project.by_homepage(self.session, 'terminal')
+        project = models.Project.by_homepage(self.session, "terminal")
         self.assertEqual(project, [])
 
     def test_project_all(self):
-        """ Test the all function of Project. """
+        """Test the all function of Project."""
         create_project(self.session)
 
-        projects = model.Project.all(self.session)
-        self.assertEqual(projects[0].name, 'geany')
-        self.assertEqual(projects[0].homepage, 'http://www.geany.org/')
-        self.assertEqual(projects[1].name, 'R2spec')
-        self.assertEqual(
-            projects[1].homepage, 'https://fedorahosted.org/r2spec/')
+        projects = models.Project.all(self.session)
+        self.assertEqual(projects[0].name, "geany")
+        self.assertEqual(projects[0].homepage, "https://www.geany.org/")
+        self.assertEqual(projects[1].name, "R2spec")
+        self.assertEqual(projects[1].homepage, "https://fedorahosted.org/r2spec/")
 
-        projects = model.Project.all(self.session, page=3)
+        projects = models.Project.all(self.session, page=3)
         self.assertEqual(projects, [])
 
     def test_project_search(self):
-        """ Test the search function of Project. """
+        """Test the search function of Project."""
         create_project(self.session)
 
-        projects = model.Project.search(self.session, 'gea')
+        projects = models.Project.search(self.session, "gea")
         self.assertEqual(projects, [])
 
-        projects = model.Project.search(self.session, 'gea*')
-        self.assertEqual(projects[0].name, 'geany')
-        self.assertEqual(projects[0].homepage, 'http://www.geany.org/')
+        projects = models.Project.search(self.session, "gea*")
+        self.assertEqual(projects[0].name, "geany")
+        self.assertEqual(projects[0].homepage, "https://www.geany.org/")
 
     def test_distro_repr(self):
-        """ Test the __repr__ function of Project. """
+        """Test the __repr__ function of Project."""
         create_project(self.session)
 
-        obs = '<Project(geany, http://www.geany.org/)>'
-        project = model.Project.by_id(self.session, 1)
+        obs = "<Project(geany, https://www.geany.org/)>"
+        project = models.Project.by_id(self.session, 1)
         self.assertEqual(str(project), obs)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     SUITE = unittest.TestLoader().loadTestsFromTestCase(Projecttests)
     unittest.TextTestRunner(verbosity=2).run(SUITE)

@@ -12,9 +12,4 @@ fi
 # If adding new functions to this file, note that you can add help text to the function
 # by defining a variable with name _<function>_help containing the help text
 
-# Set up virtualenvwrapper
-export WORKON_HOME=$HOME/.virtualenvs
-export PIP_VIRTUALENV_BASE=$WORKON_HOME
-export VIRTUALENV_USE_DISTRIBUTE=true
-export PIP_RESPECT_VIRTUALENV=true
-source /usr/bin/virtualenvwrapper.sh
+export ANITYA_WEB_CONFIG=$HOME/anitya.toml

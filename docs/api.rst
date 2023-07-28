@@ -1,6 +1,6 @@
-========================
-Anitya API Documentation
-========================
+=================
+API Documentation
+=================
 
 Anitya provides several APIs for users.
 
@@ -9,7 +9,12 @@ Anitya provides several APIs for users.
 HTTP API v2
 ===========
 
-.. autoflask:: anitya.app:APP
+The token for API could be obtained from `settings`_ page in
+Anitya web interface. This token needs to be provided in
+``Authorization`` header of the request. See request examples
+bellow.
+
+.. autoflask:: anitya.app:create()
    :undoc-static:
    :modules: anitya.api_v2
    :order: path
@@ -18,7 +23,7 @@ HTTP API v2
 HTTP API v1
 ===========
 
-.. autoflask:: anitya.app:APP
+.. autoflask:: anitya.app:create()
    :undoc-static:
    :modules: anitya.api
    :order: path
@@ -26,10 +31,6 @@ HTTP API v1
 
 Python APIs
 ===========
-
-Anitya can be used without its web front-end, if you so choose. Please be aware
-that Anitya is still in the early stages of development and its Python APIs are
-not stable.
 
 Exceptions
 ----------
@@ -42,7 +43,32 @@ Exceptions
 Database API
 ------------
 
-.. automodule:: anitya.lib.model
+.. automodule:: anitya.db
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+anitya.db.meta
+^^^^^^^^^^^^^^
+
+.. automodule:: anitya.db.meta
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+anitya.db.events
+^^^^^^^^^^^^^^^^
+
+.. automodule:: anitya.db.events
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+anitya.db.models
+^^^^^^^^^^^^^^^^
+
+.. automodule:: anitya.db.models
+    :noindex:
     :members:
     :undoc-members:
     :show-inheritance:
@@ -51,6 +77,7 @@ Backend API
 -----------
 
 .. automodule:: anitya.lib.backends
+    :noindex:
     :members:
     :undoc-members:
     :show-inheritance:
@@ -63,3 +90,22 @@ Plugin API
     :members:
     :undoc-members:
     :show-inheritance:
+
+Ecosystem API
+-------------
+
+.. automodule:: anitya.lib.ecosystems
+    :noindex:
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+Versions API
+------------
+
+.. automodule:: anitya.lib.versions.base
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. _settings: https://release-monitoring.org/settings

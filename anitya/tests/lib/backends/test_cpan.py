@@ -19,101 +19,109 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 anitya tests for the custom backend.
-'''
+"""
 
-import json
 import unittest
 
 import anitya.lib.backends.cpan as backend
-import anitya.lib.model as model
+from anitya.db import models
 from anitya.lib.exceptions import AnityaPluginException
-from anitya.tests.base import Modeltests, create_distro, skip_jenkins
+from anitya.tests.base import DatabaseTestCase, create_distro
+
+BACKEND = "CPAN (perl)"
 
 
-BACKEND = 'CPAN (perl)'
+class CpanBackendtests(DatabaseTestCase):
+    """custom backend tests."""
 
-
-class CpanBackendtests(Modeltests):
-    """ custom backend tests. """
-
-    @skip_jenkins
     def setUp(self):
-        """ Set up the environnment, ran before every tests. """
-        super(CpanBackendtests, self).setUp()
+        """Set up the environnment, ran before every tests."""
+        super().setUp()
 
         create_distro(self.session)
         self.create_project()
 
     def create_project(self):
-        """ Create some basic projects to work with. """
-        project = model.Project(
-            name='SOAP',
-            homepage='http://search.cpan.org/dist/SOAP/',
-            backend=BACKEND,
+        """Create some basic projects to work with."""
+        project = models.Project(
+            name="SOAP", homepage="http://search.cpan.org/dist/SOAP/", backend=BACKEND
         )
         self.session.add(project)
         self.session.commit()
 
-        project = model.Project(
-            name='foo',
-            homepage='http://search.cpan.org/dist/foo/',
-            backend=BACKEND,
+        project = models.Project(
+            name="foo", homepage="http://search.cpan.org/dist/foo/", backend=BACKEND
         )
         self.session.add(project)
         self.session.commit()
-
 
     def test_cpan_get_version(self):
-        """ Test the get_version function of the custom backend. """
+        """Test the get_version function of the custom backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = '0.28'
+        project = models.Project.get(self.session, pid)
+        exp = "0.28"
         obs = backend.CpanBackend.get_version(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.CpanBackend.get_version,
-            project
+            AnityaPluginException, backend.CpanBackend.get_version, project
         )
 
+    def test_get_version_url(self):
+        """Assert that correct url is returned."""
+        project = models.Project(
+            name="test", homepage="http://example.org", backend=BACKEND
+        )
+        exp = "https://metacpan.org/release/test/"
+
+        obs = backend.CpanBackend.get_version_url(project)
+
+        self.assertEqual(obs, exp)
 
     def test_cpan_get_versions(self):
-        """ Test the get_versions function of the custom backend. """
+        """Test the get_versions function of the custom backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = ['0.28']
+        project = models.Project.get(self.session, pid)
+        exp = ["0.28"]
         obs = backend.CpanBackend.get_ordered_versions(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.CpanBackend.get_version,
-            project
+            AnityaPluginException, backend.CpanBackend.get_version, project
         )
 
     def test_cpan_check_feed(self):
-        """ Test the check_feed method of the cpan backend. """
+        """Test the check_feed method of the cpan backend."""
         generator = backend.CpanBackend.check_feed()
         items = list(generator)
 
-        self.assertEqual(items[0], (
-            'Dist-Zilla-PluginBundle-Author-Plicease',
-            'http://search.cpan.org/dist/Dist-Zilla-PluginBundle-Author-Plicease/',
-            'CPAN (perl)', '2.06'))
-        self.assertEqual(items[1], (
-            'Dist-Zilla-Plugin-Author-Plicease',
-            'http://search.cpan.org/dist/Dist-Zilla-Plugin-Author-Plicease/',
-            'CPAN (perl)', '2.06'))
+        self.assertEqual(
+            items[0],
+            (
+                "URI-Fast",
+                "https://metacpan.org/release/URI-Fast/",
+                "CPAN (perl)",
+                "0.38_06",
+            ),
+        )
+        self.assertEqual(
+            items[1],
+            (
+                "Model-Envoy",
+                "https://metacpan.org/release/Model-Envoy/",
+                "CPAN (perl)",
+                "0.2.4",
+            ),
+        )
         # etc...
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     SUITE = unittest.TestLoader().loadTestsFromTestCase(CpanBackendtests)
     unittest.TextTestRunner(verbosity=2).run(SUITE)

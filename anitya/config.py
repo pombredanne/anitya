@@ -19,13 +19,12 @@
 # of Red Hat, Inc.
 """This module is responsible for loading the application configuration."""
 
-from datetime import timedelta
 import logging
 import logging.config
 import os
+from datetime import timedelta
 
-import pytoml
-
+import toml
 
 _log = logging.getLogger(__name__)
 
@@ -35,70 +34,69 @@ DEFAULTS = dict(
     # Set the time after which the session expires
     PERMANENT_SESSION_LIFETIME=timedelta(seconds=3600),
     # Secret key used to generate the csrf token in the forms
-    SECRET_KEY='changeme please',
+    SECRET_KEY="changeme please",
     # URL to the database
-    DB_URL='sqlite:////var/tmp/anitya-dev.sqlite',
+    DB_URL="sqlite:////var/tmp/anitya-dev.sqlite",
     # List of admins based on their openid
     ANITYA_WEB_ADMINS=[],
-    ANITYA_WEB_FEDORA_OPENID='https://id.fedoraproject.org',
-    ANITYA_WEB_ALLOW_FAS_OPENID=True,
-    ANITYA_WEB_ALLOW_GOOGLE_OPENID=True,
-    ANITYA_WEB_ALLOW_YAHOO_OPENID=True,
-    ANITYA_WEB_ALLOW_GENERIC_OPENID=True,
-    ADMIN_EMAIL='admin@fedoraproject.org',
+    ADMIN_EMAIL="admin@fedoraproject.org",
     ANITYA_LOG_CONFIG={
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'simple': {
-                'format': '[%(name)s %(levelname)s] %(message)s',
-            },
-        },
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'formatter': 'simple',
-                'stream': 'ext://sys.stdout',
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {"simple": {"format": "[%(name)s %(levelname)s] %(message)s"}},
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "simple",
+                "stream": "ext://sys.stdout",
             }
         },
-        'loggers': {
-            'anitya': {
-                'level': 'INFO',
-                'propagate': False,
-                'handlers': ['console'],
-            },
+        "loggers": {
+            "anitya": {"level": "INFO", "propagate": False, "handlers": ["console"]}
         },
         # The root logger configuration; this is a catch-all configuration
         # that applies to all log messages not handled by a different logger
-        'root': {
-            'level': 'INFO',
-            'handlers': ['console'],
-        },
+        "root": {"level": "INFO", "handlers": ["console"]},
     },
     # The SMTP server to send mail through
-    SMTP_SERVER='127.0.0.1',
+    SMTP_SERVER="127.0.0.1",
     # Whether or not to send emails to MAIL_ADMIN via SMTP_SERVER when HTTP 500
     # errors occur.
     EMAIL_ERRORS=False,
     BLACKLISTED_USERS=[],
-    OIDC_CLIENT_SECRETS=os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'client_secrets.json'
+    SESSION_PROTECTION="strong",
+    SOCIAL_AUTH_AUTHENTICATION_BACKENDS=(
+        "social_core.backends.fedora.FedoraOpenId",
+        "social_core.backends.gitlab.GitLabOAuth2",
+        "social_core.backends.github.GithubOAuth2",
+        "social_core.backends.google.GoogleOAuth2",
+        "social_core.backends.open_id.OpenIdAuth",
     ),
-    # Force the application to require HTTPS to save the cookie. This should only
-    # be `False` in a development environment running on the local host!
-    OIDC_ID_TOKEN_COOKIE_SECURE=True,
-    OIDC_REQUIRE_VERIFIED_EMAIL=True,
-    OIDC_OPENID_REALM='http://localhost:5000/oidc_callback',
-    OIDC_SCOPES=[
-        'https://release-monitoring.org/oidc/upstream',
-        'https://release-monitoring.org/oidc/downstream',
-    ],
+    SOCIAL_AUTH_STORAGE="social_flask_sqlalchemy.models.FlaskStorage",
+    SOCIAL_AUTH_USER_MODEL="anitya.db.models.User",
+    # Force the application to require HTTPS on authentication redirects.
+    SOCIAL_AUTH_REDIRECT_IS_HTTPS=True,
+    SOCIAL_AUTH_LOGIN_URL="/login/",
+    SOCIAL_AUTH_LOGIN_REDIRECT_URL="/",
+    SOCIAL_AUTH_LOGIN_ERROR_URL="/login-error/",
+    LIBRARIESIO_PLATFORM_WHITELIST=[],
+    DEFAULT_REGEX=r"(?i)%(name)s(?:[-_]?(?:minsrc|src|source))?[-_]([^-/_\s]+?(?:[-_]"
+    r"(?:rc|devel|dev|alpha|beta)\d+)?)(?:[-_](?:minsrc|src|source|asc|release))?"
+    r"\.(?:tar|t[bglx]z|tbz2|zip)",
+    # Token for GitHub API
+    GITHUB_ACCESS_TOKEN=None,
+    SSE_FEED="http://firehose.libraries.io/events",
+    CRON_POOL=10,  # Number of workers for check service
+    CHECK_TIMEOUT=600,  # Timeout for check service
+    # When this number of failed checks is reached,
+    # project will be automatically removed, if no version was retrieved yet
+    CHECK_ERROR_THRESHOLD=100,
+    DISTRO_MAPPING_LINKS={},
 )
 
 # Start with a basic logging configuration, which will be replaced by any user-
 # specified logging configuration when the configuration is loaded.
-logging.config.dictConfig(DEFAULTS['ANITYA_LOG_CONFIG'])
+logging.config.dictConfig(DEFAULTS["ANITYA_LOG_CONFIG"])  # type: ignore
 
 
 def load():
@@ -112,30 +110,45 @@ def load():
     """
     config = DEFAULTS.copy()
 
-    if 'ANITYA_WEB_CONFIG' in os.environ:
-        config_path = os.environ['ANITYA_WEB_CONFIG']
+    if "ANITYA_WEB_CONFIG" in os.environ:
+        config_path = os.environ["ANITYA_WEB_CONFIG"]
     else:
-        config_path = '/etc/anitya/anitya.toml'
+        config_path = "/etc/anitya/anitya.toml"
 
     if os.path.exists(config_path):
-        _log.info('Loading Anitya configuration from {}'.format(config_path))
-        with open(config_path) as fd:
+        _log.info(
+            "Loading Anitya configuration from {}".format(  # pylint: disable=C0209,W1202
+                config_path
+            )
+        )
+        with open(config_path, encoding="utf-8") as fd:
             try:
-                file_config = pytoml.loads(fd.read())
+                file_config = toml.loads(fd.read())
                 for key in file_config:
                     config[key.upper()] = file_config[key]
-            except pytoml.core.TomlError as e:
-                _log.error('Failed to parse {}: {}'.format(config_path, str(e)))
+            except toml.TomlDecodeError as e:
+                _log.error(
+                    "Failed to parse {}: {}".format(  # pylint: disable=C0209,W1202
+                        config_path, str(e)
+                    )
+                )
     else:
-        _log.info('The Anitya configuration file, {}, does not exist.'.format(config_path))
+        _log.info(
+            "The Anitya configuration file, {}, does not exist.".format(  # pylint: disable=C0209,W1202 # noqa: E501
+                config_path
+            )
+        )
 
-    if not isinstance(config['PERMANENT_SESSION_LIFETIME'], timedelta):
-        config['PERMANENT_SESSION_LIFETIME'] = timedelta(
-            seconds=config['PERMANENT_SESSION_LIFETIME'])
+    if not isinstance(config["PERMANENT_SESSION_LIFETIME"], timedelta):
+        config["PERMANENT_SESSION_LIFETIME"] = timedelta(
+            seconds=config["PERMANENT_SESSION_LIFETIME"]
+        )
 
-    if config['SECRET_KEY'] == DEFAULTS['SECRET_KEY']:
-        _log.warning('SECRET_KEY is not configured, falling back to the default. '
-                     'This is NOT safe for production deployments!')
+    if config["SECRET_KEY"] == DEFAULTS["SECRET_KEY"]:
+        _log.warning(
+            "SECRET_KEY is not configured, falling back to the default. "
+            "This is NOT safe for production deployments!"
+        )
     return config
 
 
@@ -143,4 +156,4 @@ def load():
 config = load()
 
 # With the full configuration loaded, we can now configure logging properly.
-logging.config.dictConfig(config['ANITYA_LOG_CONFIG'])
+logging.config.dictConfig(config["ANITYA_LOG_CONFIG"])

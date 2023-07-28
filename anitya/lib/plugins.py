@@ -31,31 +31,32 @@ _log = logging.getLogger(__name__)
 
 class _PluginManager(object):
     """Manage a particular set of Anitya plugins"""
+
     def __init__(self, namespace, base_class):
         self._namespace = namespace
         self._base_class = base_class
 
     def get_plugins(self):
-        ''' Return the list of plugins.'''
+        """Return the list of plugins."""
         return load(self._namespace, subclasses=self._base_class)
 
     def get_plugin_names(self):
-        ''' Return the list of plugin names. '''
+        """Return the list of plugin names."""
         plugins = self.get_plugins()
         output = [plugin.name for plugin in plugins]
         return output
 
     def get_plugin(self, plugin_name):
-        ''' Return the plugin corresponding to the given plugin name. '''
+        """Return the plugin corresponding to the given plugin name."""
         plugins = self.get_plugins()
         for plugin in plugins:
             if plugin.name.lower() == plugin_name.lower():
                 return plugin
 
 
-BACKEND_PLUGINS = _PluginManager('anitya.lib.backends', BaseBackend)
-ECOSYSTEM_PLUGINS = _PluginManager('anitya.lib.ecosystems', BaseEcosystem)
-VERSION_PLUGINS = _PluginManager('anitya.lib.versions', Version)
+BACKEND_PLUGINS = _PluginManager("anitya.lib.backends", BaseBackend)
+ECOSYSTEM_PLUGINS = _PluginManager("anitya.lib.ecosystems", BaseEcosystem)
+VERSION_PLUGINS = _PluginManager("anitya.lib.versions", Version)
 
 
 def _load_backend_plugins(session):
@@ -70,12 +71,19 @@ def _load_ecosystem_plugins(session):
     return plugins
 
 
+def _load_version_plugins(session):
+    """Load any new version plugins into the DB"""
+    plugins = list(VERSION_PLUGINS.get_plugins())
+    return plugins
+
+
 def load_all_plugins(session):
-    ''' Load all the plugins and insert them in the database if they are
-    not already present. '''
+    """Load all the plugins and insert them in the database if they are
+    not already present."""
     plugins = {}
     plugins["backends"] = _load_backend_plugins(session)
     plugins["ecosystems"] = _load_ecosystem_plugins(session)
+    plugins["versions"] = _load_version_plugins(session)
     return plugins
 
 
@@ -85,6 +93,10 @@ get_plugins = BACKEND_PLUGINS.get_plugins
 get_plugin = BACKEND_PLUGINS.get_plugin
 
 
-def load_plugins(session):
-    ''' Calls load_all_plugins, but only returns the backends plugin list '''
-    return load_all_plugins(session)["backends"]
+def load_plugins(session, family="backends"):
+    """Calls load_all_plugins, but only retuns plugins specified by family argument
+
+    Args:
+        family (str): family of the plugins, that should be returned
+    """
+    return load_all_plugins(session)[family]

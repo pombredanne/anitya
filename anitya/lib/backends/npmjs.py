@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2016 - Copyright Red Hat Inc
+ (c) 2014-2020 - Copyright Red Hat Inc
 
  Authors:
    Pierre-Yves Chibon <pingou@pingoured.fr>
@@ -14,24 +14,24 @@ from anitya.lib.exceptions import AnityaPluginException
 
 
 class NpmjsBackend(BaseBackend):
-    ''' The custom class for projects hosted on npmjs.org.
+    """The custom class for projects hosted on npmjs.org.
 
     This backend allows to specify a version_url and a regex that will
     be used to retrieve the version information.
-    '''
+    """
 
-    name = 'npmjs'
+    name = "npmjs"
     examples = [
-        'https://www.npmjs.org/package/request',
-        'https://www.npmjs.org/package/colors',
+        "https://www.npmjs.org/package/request",
+        "https://www.npmjs.org/package/colors",
     ]
 
     @classmethod
     def get_version(cls, project):
-        ''' Method called to retrieve the latest version of the projects
+        """Method called to retrieve the latest version of the projects
         provided, project that relies on the backend of this plugin.
 
-        :arg Project project: a :class:`model.Project` object whose backend
+        :arg Project project: a :class:`anitya.db.models.Project` object whose backend
             corresponds to the current plugin.
         :return: the latest version found upstream
         :return type: str
@@ -39,33 +39,54 @@ class NpmjsBackend(BaseBackend):
             :class:`anitya.lib.exceptions.AnityaPluginException` exception
             when the version cannot be retrieved correctly
 
-        '''
-        url_template = 'http://registry.npmjs.org/%(name)s'
-
-        url = url_template % {'name': project.name}
+        """
+        url = cls.get_version_url(project)
+        last_change = project.get_time_last_created_version()
 
         try:
-            req = cls.call_url(url)
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('Could not contact %s' % url)
+            req = cls.call_url(url, last_change=last_change)
+        except Exception as err:  # pragma: no cover
+            raise AnityaPluginException(f"Could not contact {url}") from err
+
+        # Not modified
+        if req.status_code == 304:
+            return None
 
         try:
             data = req.json()
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('No JSON returned by %s' % url)
+        except Exception as err:  # pragma: no cover
+            raise AnityaPluginException(f"No JSON returned by {url}") from err
 
-        if 'dist-tags' in data and 'latest' in data['dist-tags']:
-            return data['dist-tags']['latest']
+        if "dist-tags" in data and "latest" in data["dist-tags"]:
+            return data["dist-tags"]["latest"]
         else:
             return cls.get_ordered_versions(project)[-1]
 
     @classmethod
+    def get_version_url(cls, project):
+        """Method called to retrieve the url used to check for new version
+        of the project provided, project that relies on the backend of this plugin.
+
+        Attributes:
+            project (:obj:`anitya.db.models.Project`): Project object whose backend
+                corresponds to the current plugin.
+
+        Returns:
+            str: url used for version checking
+        """
+        url_template = "https://registry.npmjs.org/%(name)s"
+
+        url = url_template % {"name": project.name}
+
+        return url
+
+    @classmethod
     def get_versions(cls, project):
-        ''' Method called to retrieve all the versions (that can be found)
+        """Method called to retrieve all the versions (that can be found)
         of the projects provided, project that relies on the backend of
         this plugin.
 
-        :arg Project project: a :class:`model.Project` object whose backend
+        :arg Project project: a :class:`anitya.db.models.Project` object whose backend
             corresponds to the current plugin.
         :return: a list of all the possible releases found
         :return type: list
@@ -73,47 +94,64 @@ class NpmjsBackend(BaseBackend):
             :class:`anitya.lib.exceptions.AnityaPluginException` exception
             when the versions cannot be retrieved correctly
 
-        '''
-        url_template = 'http://registry.npmjs.org/%(name)s'
-
-        url = url_template % {'name': project.name}
+        """
+        url = cls.get_version_url(project)
+        last_change = project.get_time_last_created_version()
 
         try:
-            req = cls.call_url(url)
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('Could not contact %s' % url)
+            req = cls.call_url(url, last_change=last_change)
+        except Exception as err:  # pragma: no cover
+            raise AnityaPluginException(f"Could not contact {url}") from err
+
+        # Not modified
+        if req.status_code == 304:
+            return []
 
         try:
             data = req.json()
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('No JSON returned by %s' % url)
+        except Exception as err:  # pragma: no cover
+            raise AnityaPluginException(f"No JSON returned by {url}") from err
 
-        if 'error' in data or 'versions' not in data:
-            raise AnityaPluginException('No versions found at %s' % url)
+        if "error" in data or "versions" not in data:
+            raise AnityaPluginException(f"No versions found at {url}")
 
-        return list(data['versions'].keys())
+        # Filter retrieved versions
+        filtered_versions = BaseBackend.filter_versions(
+            list(data["versions"].keys()), project.version_filter
+        )
+        return filtered_versions
 
     @classmethod
     def check_feed(cls):
-        ''' Return a generator over the latest 40 uploads to npmjs.org
+        """Return a generator over the latest 40 uploads to npmjs.org
 
         by querying an weird JSON endpoint.
-        '''
+        """
 
-        url = 'https://registry.npmjs.org/-/all/static/today.json'
+        url = (
+            "https://skimdb.npmjs.com/registry/_changes?"
+            "feed=normal"
+            "&descending=true"
+            "&limit=40"
+            "&include_docs=true"
+            "&attachments=false"
+        )
 
         try:
             response = cls.call_url(url)
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('Could not contact %s' % url)
+        except Exception as err:  # pragma: no cover
+            raise AnityaPluginException(f"Could not contact {url}") from err
 
         try:
             data = response.json()
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('No JSON returned by %s' % url)
+        except Exception as err:  # pragma: no cover
+            raise AnityaPluginException(f"No JSON returned by {url}") from err
 
-        for item in data[:40]:
-            for version in item.get('versions', []):
-                name = item['name']
-                homepage = 'http://npmjs.org/package/%s' % name
+        for item in data["results"]:
+            if item.get("deleted"):
+                continue
+            doc = item["doc"]
+            name = doc["name"]
+            homepage = doc.get("homepage", f"https://npmjs.org/package/{name}")
+            for version in doc.get("versions", []):
                 yield name, homepage, cls.name, version

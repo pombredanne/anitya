@@ -1,24 +1,64 @@
 ---
 
 - name: Install helpful development packages
-  dnf: name={{ item }} state=present
-  with_items:
-    - git
-    - python-virtualenvwrapper
-    - vim-enhanced
+  dnf:
+    name: [
+           git,
+           vim-enhanced,
+           python-devel,
+           python36,
+           python37,
+           python3-black,
+           python3-tox,
+           tmux
+          ]
+    state: present
 
 - name: Install anitya system dependencies
-  dnf: name={{ item }} state=present
-  with_items:
-    - fedmsg
-    - gcc
-    - libffi-devel
-    - openssl-devel
-    - postgresql-devel
-    - python2-devel
-    - python3-devel
-    - redhat-rpm-config
-    - rpm-python
+  dnf:
+    name: [
+           gcc,
+           graphviz,
+           make,
+           libffi-devel,
+           openssl-devel,
+           postgresql-devel,
+           python3-devel,
+           python3-psycopg2,
+           npm
+          ]
+    state: present
+
+- name: Install documentation build dependencies
+  dnf:
+    name: [
+           python3-sphinxcontrib-httpdomain,
+           python3-sqlalchemy_schemadisplay
+          ]
+    state: present
+
+- name: Install dependencies packaged in Fedora
+  dnf:
+    name: [
+           fedora-messaging,
+           python3-alembic,
+           python3-arrow,
+           python3-beautifulsoup4,
+           python3-dateutil,
+           python3-defusedxml,
+           python3-flask-login,
+           python3-flask-wtf,
+           python3-jinja2,
+           python3-ordered-set,
+           python3-toml,
+           python3-semver,
+           python3-sqlalchemy,
+           python3-sseclient,
+           python3-straight-plugin,
+           python3-wtforms
+          ]
+    state: present
+  tags: packages
 
 # Add various helpful configuration files
 - name: Install a custom bashrc
@@ -32,53 +72,17 @@
   become_user: "{{ ansible_env.SUDO_USER }}"
   copy: src=anitya.toml dest=/home/{{ ansible_env.SUDO_USER }}/anitya.toml
 
-# We need to use the system-site-packages for now because we use the rpm module
-- name: Create Anitya virtualenv
-  become_user: "{{ ansible_env.SUDO_USER }}"
-  shell: >
-      source ~/.bashrc && mkvirtualenv anitya -a ~/devel/ &&
-      virtualenv --system-site-packages ~/.virtualenvs/anitya/
+- name: Download package dependencies
+  ansible.builtin.shell: npm install
   args:
-    creates: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya
-
-- name: Install Anitya requirements into the virtualenv
-  become_user: "{{ ansible_env.SUDO_USER }}"
-  pip:
-    requirements: "requirements/requirements.txt"
-    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
-    virtualenv_python: python2
-  args:
-    chdir: /home/{{ ansible_env.SUDO_USER }}/devel
-
-- name: Install PostgreSQL driver in the virtualenv
-  become_user: "{{ ansible_env.SUDO_USER }}"
-  pip:
-    name: "psycopg2"
-    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
-    virtualenv_python: python2
-  args:
-    chdir: /home/{{ ansible_env.SUDO_USER }}/devel
-
-- name: Install Anitya test requirements into the virtualenv
-  become_user: "{{ ansible_env.SUDO_USER }}"
-  pip:
-    requirements: "requirements/test_requirements.txt"
-    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
-    virtualenv_python: python2
-  args:
-    chdir: /home/{{ ansible_env.SUDO_USER }}/devel
-
-- name: Install Tox
-  become_user: "{{ ansible_env.SUDO_USER }}"
-  pip: name=tox virtualenv=/home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
+    chdir: /home/{{ ansible_env.SUDO_USER }}/devel/anitya/static
 
 - name: Install Anitya into the virtualenv
-  become_user: "{{ ansible_env.SUDO_USER }}"
   pip:
-    name: "file:///home/{{ ansible_env.SUDO_USER }}/devel"
+    name:
+      - "{{ anitya_src }}"
     extra_args: "-e"
-    virtualenv: /home/{{ ansible_env.SUDO_USER }}/.virtualenvs/anitya/
-    virtualenv_python: python2
+  tags: install
 
 - name: Create user systemd directory
   become_user: "{{ ansible_env.SUDO_USER }}"
@@ -92,6 +96,12 @@
     src: anitya.service
     dest: /home/{{ ansible_env.SUDO_USER }}/.config/systemd/user/anitya.service
 
+- name: Install the Anitya check service systemd file
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  copy:
+    src: check-service.service
+    dest: /home/{{ ansible_env.SUDO_USER }}/.config/systemd/user/check-service.service
+
 - name: Reload the systemd daemon
   become_user: "{{ ansible_env.SUDO_USER }}"
   command: systemctl --user daemon-reload
@@ -99,9 +109,19 @@
 - name: Build the Anitya documentation
   become_user: "{{ ansible_env.SUDO_USER }}"
   shell: >
-      source ~/.virtualenvs/anitya/bin/activate && make install
+      make install
   args:
     chdir: /home/{{ ansible_env.SUDO_USER }}/devel/docs/
     creates: /home/{{ ansible_env.SUDO_USER }}/devel/anitya/static/docs/objects.inv
 
-- include: db.yml
+# Hotfix for social_auth issue
+# Could be removed when we move away from social_auth
+- name: Hotfix for social_auth
+  replace:
+    path: /usr/local/lib/python3.11/site-packages/social_sqlalchemy/storage.py
+    regexp: 'base64\.encodestring'
+    replace: 'base64.encodebytes'
+
+- import_tasks: db.yml
+- import_tasks: librariesio.yml
+- import_tasks: rabbitmq.yml

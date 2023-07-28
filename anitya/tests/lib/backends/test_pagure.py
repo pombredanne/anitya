@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright © 2015  Red Hat, Inc.
+# Copyright © 2015-2019  Red Hat, Inc.
 #
 # This copyrighted material is made available to anyone wishing to use,
 # modify, copy, or redistribute it subject to the terms and conditions
@@ -19,87 +19,119 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 anitya tests for the pagure backend.
-'''
+"""
 
-import json
 import unittest
 
+import mock
+
 import anitya.lib.backends.pagure as backend
-import anitya.lib.model as model
+from anitya.db import models
 from anitya.lib.exceptions import AnityaPluginException
-from anitya.tests.base import Modeltests, create_distro, skip_jenkins
+from anitya.tests.base import DatabaseTestCase, create_distro
+
+BACKEND = "pagure"
 
 
-BACKEND = 'pagure'
+class PagureBackendtests(DatabaseTestCase):
+    """pagure backend tests."""
 
-
-class PagureBackendtests(Modeltests):
-    """ pagure backend tests. """
-
-    @skip_jenkins
     def setUp(self):
-        """ Set up the environnment, ran before every tests. """
-        super(PagureBackendtests, self).setUp()
+        """Set up the environnment, ran before every tests."""
+        super().setUp()
 
         create_distro(self.session)
         self.create_project()
 
     def create_project(self):
-        """ Create some basic projects to work with. """
-        project = model.Project(
-            name='pagure',
-            homepage='https://pagure.io/pagure',
-            backend=BACKEND,
+        """Create some basic projects to work with."""
+        project = models.Project(
+            name="pagure", homepage="https://pagure.io/pagure", backend=BACKEND
         )
         self.session.add(project)
         self.session.commit()
 
-        project = model.Project(
-            name='fake',
-            homepage='https://pagure.io/fake',
-            backend=BACKEND,
+        project = models.Project(
+            name="fake", homepage="https://pagure.io/fake", backend=BACKEND
         )
         self.session.add(project)
         self.session.commit()
 
     def test_pagure_get_version(self):
-        """ Test the get_version function of the pagure backend. """
+        """Test the get_version function of the pagure backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = '0.1.16'
+        project = models.Project.get(self.session, pid)
+        exp = "0.1.16"
         obs = backend.PagureBackend.get_version(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.PagureBackend.get_version,
-            project
+            AnityaPluginException, backend.PagureBackend.get_version, project
         )
 
+    def test_get_version_url(self):
+        """
+        Assert that correct url is returned.
+        """
+        project = models.Project(
+            name="test", homepage="https://example.org", backend=BACKEND
+        )
+        exp = "https://pagure.io/api/0/test/git/tags"
+
+        obs = backend.PagureBackend.get_version_url(project)
+
+        self.assertEqual(obs, exp)
+
     def test_pagure_get_versions(self):
-        """ Test the get_versions function of the pagure backend. """
+        """Test the get_versions function of the pagure backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         exp = [
-            '0.1', '0.1.1', '0.1.10', '0.1.11', '0.1.12', '0.1.13', '0.1.14',
-            '0.1.15', '0.1.16', '0.1.2', '0.1.3', '0.1.4', '0.1.5', '0.1.6',
-            '0.1.7', '0.1.8', '0.1.9']
+            "0.1",
+            "0.1.1",
+            "0.1.10",
+            "0.1.11",
+            "0.1.12",
+            "0.1.13",
+            "0.1.14",
+            "0.1.15",
+            "0.1.16",
+            "0.1.2",
+            "0.1.3",
+            "0.1.4",
+            "0.1.5",
+            "0.1.6",
+            "0.1.7",
+            "0.1.8",
+            "0.1.9",
+        ]
         obs = backend.PagureBackend.get_versions(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.PagureBackend.get_versions,
-            project
+            AnityaPluginException, backend.PagureBackend.get_versions, project
         )
 
+    def test_pagure_get_versions_not_modified(self):
+        """Assert that not modified response is handled correctly"""
+        pid = 1
+        project = models.Project.get(self.session, pid)
+        exp_url = "https://pagure.io/api/0/pagure/git/tags"
 
-if __name__ == '__main__':
+        with mock.patch("anitya.lib.backends.BaseBackend.call_url") as m_call:
+            m_call.return_value = mock.Mock(status_code=304)
+            versions = backend.PagureBackend.get_versions(project)
+
+            m_call.assert_called_with(exp_url, last_change=None)
+            self.assertEqual(versions, [])
+
+
+if __name__ == "__main__":
     SUITE = unittest.TestLoader().loadTestsFromTestCase(PagureBackendtests)
     unittest.TextTestRunner(verbosity=2).run(SUITE)

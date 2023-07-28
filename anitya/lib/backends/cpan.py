@@ -9,48 +9,52 @@
 
 """
 
-import anitya.lib.xml2dict as xml2dict
+import logging
 
-from anitya.lib.backends import BaseBackend, get_versions_by_regex, REGEX
+from defusedxml import ElementTree as ET
+
+from anitya.lib.backends import REGEX, BaseBackend, get_versions_by_regex
 from anitya.lib.exceptions import AnityaPluginException
+
+_log = logging.getLogger(__name__)
 
 
 class CpanBackend(BaseBackend):
-    ''' The custom class for projects hosted on CPAN.
+    """The custom class for projects hosted on CPAN.
 
     This backend allows to specify a version_url and a regex that will
     be used to retrieve the version information.
-    '''
+    """
 
-    name = 'CPAN (perl)'
+    name = "CPAN (perl)"
     examples = [
-        'http://search.cpan.org/dist/Net-Whois-Raw/',
-        'http://search.cpan.org/dist/SOAP/',
+        "https://metacpan.org/release/Net-Whois-Raw/",
+        "https://metacpan.org/release/SOAP/",
     ]
 
     @classmethod
-    def get_version(cls, project):
-        ''' Method called to retrieve the latest version of the projects
-        provided, project that relies on the backend of this plugin.
+    def get_version_url(cls, project):
+        """Method called to retrieve the url used to check for new version
+        of the project provided, project that relies on the backend of this plugin.
 
-        :arg Project project: a :class:`model.Project` object whose backend
-            corresponds to the current plugin.
-        :return: the latest version found upstream
-        :return type: str
-        :raise AnityaPluginException: a
-            :class:`anitya.lib.exceptions.AnityaPluginException` exception
-            when the version cannot be retrieved correctly
+        Attributes:
+            project (:obj:`anitya.db.models.Project`): Project object whose backend
+                corresponds to the current plugin.
 
-        '''
-        return cls.get_ordered_versions(project)[-1]
+        Returns:
+            str: url used for version checking
+        """
+        url = f"https://metacpan.org/release/{project.name}/"
+
+        return url
 
     @classmethod
     def get_versions(cls, project):
-        ''' Method called to retrieve all the versions (that can be found)
+        """Method called to retrieve all the versions (that can be found)
         of the projects provided, project that relies on the backend of
         this plugin.
 
-        :arg Project project: a :class:`model.Project` object whose backend
+        :arg Project project: a :class:`anitya.db.models.Project` object whose backend
             corresponds to the current plugin.
         :return: a list of all the possible releases found
         :return type: list
@@ -58,37 +62,37 @@ class CpanBackend(BaseBackend):
             :class:`anitya.lib.exceptions.AnityaPluginException` exception
             when the versions cannot be retrieved correctly
 
-        '''
-        url = 'http://search.cpan.org/dist/%(name)s/' % {
-            'name': project.name}
+        """
+        url = cls.get_version_url(project)
 
-        regex = REGEX % {'name': project.name}
+        regex = REGEX % {"name": project.name}
 
         return get_versions_by_regex(url, regex, project)
 
     @classmethod
     def check_feed(cls):
-        ''' Return a generator over the latest uploads to CPAN
+        """Return a generator over the latest uploads to CPAN
 
         by querying an RSS feed.
-        '''
+        """
 
-        url = 'http://search.cpan.org/uploads.rdf'
+        url = "https://metacpan.org/feed/recent"
 
         try:
             response = cls.call_url(url)
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('Could not contact %s' % url)
+        except Exception as exc:  # pragma: no cover
+            raise AnityaPluginException(f"Could not contact {url}") from exc
 
         try:
-            parser = xml2dict.XML2Dict()
-            data = parser.fromstring(response.text)
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('No XML returned by %s' % url)
+            root = ET.fromstring(response.text)
+        except ET.ParseError as exc:
+            raise AnityaPluginException(f"No XML returned by {url}") from exc
 
-        items = data['RDF']['item']
-        for entry in items:
-            title = entry['title']['value']
-            name, version = title.rsplit('-', 1)
-            homepage = 'http://search.cpan.org/dist/%s/' % name
+        for item in root.iter(tag="{http://purl.org/rss/1.0/}item"):
+            title = item.find("{http://purl.org/rss/1.0/}title")
+            try:
+                name, version = title.text.rsplit("-", 1)
+            except ValueError:
+                _log.info("Unable to parse CPAN package %s into a name and version")
+            homepage = f"https://metacpan.org/release/{name}/"
             yield name, homepage, cls.name, version

@@ -27,12 +27,11 @@ import re
 
 from .base import Version
 
-
 try:
     from rpm import labelCompare as _compare_rpm_labels
 except ImportError:
     # Emulate RPM field comparisons as described in
-    # http://stackoverflow.com/questions/3206319/how-do-i-compare-rpm-versions-in-python/3206477#3206477
+    # https://stackoverflow.com/a/3206477
     #
     # * Search each string for alphabetic fields [a-zA-Z]+ and
     #   numeric fields [0-9]+ separated by junk [^a-zA-Z0-9]*.
@@ -45,15 +44,13 @@ except ImportError:
     #   considered greater (newer).
 
     import warnings
+
     warnings.warn("Failed to import 'rpm', emulating RPM label comparisons")
 
-    try:
-        from itertools import zip_longest
-    except ImportError:
-        from itertools import izip_longest as zip_longest
+    from itertools import zip_longest
 
     _subfield_pattern = re.compile(
-        r'(?P<junk>[^a-zA-Z0-9]*)((?P<text>[a-zA-Z]+)|(?P<num>[0-9]+))'
+        r"(?P<junk>[^a-zA-Z0-9]*)((?P<text>[a-zA-Z]+)|(?P<num>[0-9]+))"
     )
 
     def _iter_rpm_subfields(field):
@@ -63,11 +60,11 @@ except ImportError:
         Numeric subfields are yielded as (1, int_value)
         """
         for subfield in _subfield_pattern.finditer(field):
-            text = subfield.group('text')
+            text = subfield.group("text")
             if text is not None:
                 yield (0, text)
             else:
-                yield (1, int(subfield.group('num')))
+                yield (1, int(subfield.group("num")))
 
     def _compare_rpm_field(lhs, rhs):
         # Short circuit for exact matches (including both being None)
@@ -112,14 +109,15 @@ class RpmVersion(Version):
     back to a pure Python implementation if they are not installed.
     """
 
-    name = u'RPM'
+    name = "RPM"
 
     _rc_upstream_regex = re.compile(
-        "(.*?)\.?(-?(rc|pre|beta|alpha|dev)([0-9]*))", re.I)
+        r"(.*?)\.?(-?(rc|pre|beta|alpha|dev)([0-9]*))", re.I
+    )
 
     @classmethod
     def split_rc(cls, version):
-        """ Split (upstream) version into version and release candidate string +
+        """Split (upstream) version into version and release candidate string +
         release candidate number if possible
 
         Code from Till Maas as part of
@@ -133,7 +131,7 @@ class RpmVersion(Version):
                 is one of (rc, pre, beta, alpha, dev).
         """
         match = cls._rc_upstream_regex.match(version)
-        if not match:
+        if not match or not match.group(1):
             return (version, "", "")
 
         return (match.group(1), match.group(3), match.group(4))
@@ -145,7 +143,14 @@ class RpmVersion(Version):
         This recognizes versions containing "rc", "pre", "beta", "alpha", and
         "dev" as being pre-release versions.
         """
-        return self.split_rc(self.parse())[1] != ''
+        if self.split_rc(self.parse())[1]:
+            return True
+
+        for pre_release_filter in self.pre_release_filters:
+            if pre_release_filter and pre_release_filter in self.version:
+                return True
+
+        return False
 
     def __eq__(self, other):
         """
@@ -153,19 +158,24 @@ class RpmVersion(Version):
         support.
         """
         v1, rc1, rcn1 = self.split_rc(self.parse())
+        if not v1:
+            return False
         v2, rc2, rcn2 = self.split_rc(other.parse())
+        if not v2:
+            return False
         result = _compare_rpm_labels((None, v1, None), (None, v2, None))
         if result != 0:
             return False
 
-        if rc1 == rc2 and rcn1 == rcn2:
-            return True
-        else:
-            return False
+        return bool(rc1 == rc2 and rcn1 == rcn2)
 
     def __lt__(self, other):
         v1, rc1, rcn1 = self.split_rc(self.parse())
+        if not v1:
+            return True
         v2, rc2, rcn2 = self.split_rc(other.parse())
+        if not v2:
+            return False
         result = _compare_rpm_labels((None, v1, None), (None, v2, None))
         if result == -1:
             return True

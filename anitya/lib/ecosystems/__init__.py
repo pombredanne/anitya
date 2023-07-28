@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
+
+# (c) 2016 - Copyright Red Hat Inc
+
 """
- (c) 2016 - Copyright Red Hat Inc
+ The Anitya ecosystems API.
 
  Authors:
    Nick Coghlan <ncoghlan@redhat.com>
@@ -9,8 +12,13 @@
 """
 
 
+from typing import List
+
+from anitya.lib.versions import GLOBAL_DEFAULT as DEFAULT_VERSION_SCHEME
+
+
 class BaseEcosystem(object):
-    '''
+    """
     The base class that all the different ecosystems should extend.
 
     Attributes:
@@ -21,8 +29,11 @@ class BaseEcosystem(object):
         default_version_scheme (str): The default version scheme to use for
             projects in this ecosystem if a they don't explicitly define one to
             use.
-    '''
+        aliases (list): A list of alternate names for this ecosystem. These
+            should be lowercase.
+    """
 
-    name = None
-    default_backend = None
-    default_version_scheme = None
+    name: str
+    default_backend: str
+    default_version_scheme: str = DEFAULT_VERSION_SCHEME
+    aliases: List[str] = []

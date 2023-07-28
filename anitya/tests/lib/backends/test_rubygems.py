@@ -19,98 +19,123 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 anitya tests for the custom backend.
-'''
+"""
 
 import unittest
 
+import mock
+
 import anitya.lib.backends.rubygems as backend
-import anitya.lib.model as model
+from anitya.db import models
 from anitya.lib.exceptions import AnityaPluginException
-from anitya.tests.base import Modeltests, create_distro, skip_jenkins
+from anitya.tests.base import DatabaseTestCase, create_distro
+
+BACKEND = "Rubygems"
 
 
-BACKEND = 'Rubygems'
+class RubygemsBackendtests(DatabaseTestCase):
+    """Rubygems backend tests."""
 
-
-class RubygemsBackendtests(Modeltests):
-    """ Rubygems backend tests. """
-
-    @skip_jenkins
     def setUp(self):
-        """ Set up the environnment, ran before every tests. """
-        super(RubygemsBackendtests, self).setUp()
+        """Set up the environnment, ran before every tests."""
+        super().setUp()
 
         create_distro(self.session)
         self.create_project()
 
     def create_project(self):
-        """ Create some basic projects to work with. """
-        project = model.Project(
-            name='bio',
-            homepage='http://rubygems.org/gems/bio',
-            backend=BACKEND,
+        """Create some basic projects to work with."""
+        project = models.Project(
+            name="bio", homepage="https://rubygems.org/gems/bio", backend=BACKEND
         )
         self.session.add(project)
         self.session.commit()
 
-        project = model.Project(
-            name='biofoobar',
-            homepage='http://rubygems.org/gems/biofoobar',
+        project = models.Project(
+            name="biofoobar",
+            homepage="https://rubygems.org/gems/biofoobar",
             backend=BACKEND,
         )
         self.session.add(project)
         self.session.commit()
-
 
     def test_get_version(self):
-        """ Test the get_version function of the rubygems backend. """
+        """Test the get_version function of the rubygems backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = '1.4.3.0001'
+        project = models.Project.get(self.session, pid)
+        exp = "1.5.1"
         obs = backend.RubygemsBackend.get_version(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.RubygemsBackend.get_version,
-            project
+            AnityaPluginException, backend.RubygemsBackend.get_version, project
         )
 
+    def test_get_version_url(self):
+        """
+        Assert that correct url is returned.
+        """
+        project = models.Project(
+            name="test", homepage="https://example.org", backend=BACKEND
+        )
+        exp = "https://rubygems.org/api/v1/versions/test/latest.json"
+
+        obs = backend.RubygemsBackend.get_version_url(project)
+
+        self.assertEqual(obs, exp)
 
     def test_get_versions(self):
-        """ Test the get_versions function of the rubygems backend. """
+        """Test the get_versions function of the rubygems backend."""
         pid = 1
-        project = model.Project.get(self.session, pid)
-        exp = ['1.4.3.0001']
+        project = models.Project.get(self.session, pid)
+        exp = ["1.5.1"]
         obs = backend.RubygemsBackend.get_ordered_versions(project)
         self.assertEqual(obs, exp)
 
         pid = 2
-        project = model.Project.get(self.session, pid)
+        project = models.Project.get(self.session, pid)
         self.assertRaises(
-            AnityaPluginException,
-            backend.RubygemsBackend.get_version,
-            project
+            AnityaPluginException, backend.RubygemsBackend.get_version, project
         )
 
+    def test_rubygems_get_versions_not_modified(self):
+        """Assert that not modified response is handled correctly"""
+        pid = 1
+        project = models.Project.get(self.session, pid)
+        exp_url = "https://rubygems.org/api/v1/versions/bio/latest.json"
+
+        with mock.patch("anitya.lib.backends.BaseBackend.call_url") as m_call:
+            m_call.return_value = mock.Mock(status_code=304)
+            versions = backend.RubygemsBackend.get_versions(project)
+
+            m_call.assert_called_with(exp_url, last_change=None)
+            self.assertEqual(versions, [])
+
     def test_rubygems_check_feed(self):
-        """ Test the check_feed method of the rubygems backend. """
+        """Test the check_feed method of the rubygems backend."""
         generator = backend.RubygemsBackend.check_feed()
         items = list(generator)
 
-        self.assertEqual(items[0], (
-            'culqi', 'http://rubygems.org/gems/culqi',
-            'Rubygems', '1.1.4'))
-        self.assertEqual(items[1], (
-            'rspec-instafail', 'http://rubygems.org/gems/rspec-instafail',
-            'Rubygems', '0.5.0'))
+        self.assertEqual(
+            items[0],
+            (
+                "mathrix-rails",
+                "https://rubygems.org/gems/mathrix-rails",
+                "Rubygems",
+                "1.0.0",
+            ),
+        )
+        self.assertEqual(
+            items[1],
+            ("zipcoder", "https://rubygems.org/gems/zipcoder", "Rubygems", "0.2.0"),
+        )
         # etc...
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     SUITE = unittest.TestLoader().loadTestsFromTestCase(RubygemsBackendtests)
     unittest.TextTestRunner(verbosity=2).run(SUITE)

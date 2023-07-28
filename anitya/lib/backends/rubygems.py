@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2016 - Copyright Red Hat Inc
+ (c) 2014-2020 - Copyright Red Hat Inc
 
  Authors:
    Pierre-Yves Chibon <pingou@pingoured.fr>
    Ralph Bean <rbean@redhat.com>
+   Michal Konecny <mkonecny@redhat.com>
 
 """
 
@@ -14,40 +15,37 @@ from anitya.lib.exceptions import AnityaPluginException
 
 
 class RubygemsBackend(BaseBackend):
-    ''' The custom class for projects hosted on rubygems.org.
+    """The custom class for projects hosted on rubygems.org.
 
     This backend allows to specify a version_url and a regex that will
-    be used to retrieve the version information. '''
+    be used to retrieve the version information."""
 
-    name = 'Rubygems'
-    examples = [
-        'http://rubygems.org/gems/aa',
-        'http://rubygems.org/gems/bio',
-    ]
+    name = "Rubygems"
+    examples = ["https://rubygems.org/gems/aa", "https://rubygems.org/gems/bio"]
 
     @classmethod
-    def get_version(cls, project):
-        ''' Method called to retrieve the latest version of the projects
-        provided, project that relies on the backend of this plugin.
+    def get_version_url(cls, project):
+        """Method called to retrieve the url used to check for new version
+        of the project provided, project that relies on the backend of this plugin.
 
-        :arg Project project: a :class:`model.Project` object whose backend
-            corresponds to the current plugin.
-        :return: the latest version found upstream
-        :return type: str
-        :raise AnityaPluginException: a
-            :class:`anitya.lib.exceptions.AnityaPluginException` exception
-            when the version cannot be retrieved correctly
+        Attributes:
+            project (:obj:`anitya.db.models.Project`): Project object whose backend
+                corresponds to the current plugin.
 
-        '''
-        return cls.get_ordered_versions(project)[-1]
+        Returns:
+            str: url used for version checking
+        """
+        url = f"https://rubygems.org/api/v1/versions/{project.name}/latest.json"
+
+        return url
 
     @classmethod
     def get_versions(cls, project):
-        ''' Method called to retrieve all the versions (that can be found)
+        """Method called to retrieve all the versions (that can be found)
         of the projects provided, project that relies on the backend of
         this plugin.
 
-        :arg Project project: a :class:`model.Project` object whose backend
+        :arg Project project: a :class:`anitya.db.models.Project` object whose backend
             corresponds to the current plugin.
         :return: a list of all the possible releases found
         :return type: list
@@ -55,46 +53,55 @@ class RubygemsBackend(BaseBackend):
             :class:`anitya.lib.exceptions.AnityaPluginException` exception
             when the versions cannot be retrieved correctly
 
-        '''
-        url = 'http://rubygems.org/api/v1/versions/%(name)s/latest.json' % {
-            'name': project.name}
+        """
+        url = cls.get_version_url(project)
 
+        last_change = project.get_time_last_created_version()
         try:
-            req = cls.call_url(url)
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('Could not contact %s' % url)
+            req = cls.call_url(url, last_change=last_change)
+        except Exception as exc:  # pragma: no cover
+            raise AnityaPluginException(f"Could not contact {url}") from exc
+
+        # Not modified
+        if req.status_code == 304:
+            return []
 
         try:
             data = req.json()
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('No JSON returned by %s' % url)
+        except Exception as exc:  # pragma: no cover
+            raise AnityaPluginException(f"No JSON returned by {url}") from exc
 
-        if data['version'] == 'unknown':
+        if data["version"] == "unknown":
             raise AnityaPluginException(
-                'Project or version unknown at %s' % url)
+                f"Project or version unknown at {url}"
+            )  # pragma: no cover
 
-        return [data['version']]
+        # Filter retrieved versions
+        filtered_versions = cls.filter_versions(
+            [data["version"]], project.version_filter
+        )
+        return filtered_versions
 
     @classmethod
     def check_feed(cls):
-        ''' Return a generator over the latest 50 uploads to rubygems.org
+        """Return a generator over the latest 50 uploads to rubygems.org
 
         by querying the JSON API.
-        '''
+        """
 
-        url = 'https://rubygems.org/api/v1/activity/just_updated.json'
+        url = "https://rubygems.org/api/v1/activity/just_updated.json"
 
         try:
             response = cls.call_url(url)
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('Could not contact %s' % url)
+        except Exception as exc:  # pragma: no cover
+            raise AnityaPluginException(f"Could not contact {url}") from exc
 
         try:
             data = response.json()
-        except Exception:  # pragma: no cover
-            raise AnityaPluginException('No XML returned by %s' % url)
+        except Exception as exc:  # pragma: no cover
+            raise AnityaPluginException(f"No XML returned by {url}") from exc
 
         for item in data:
-            name, version = item['name'], item['version']
-            homepage = 'http://rubygems.org/gems/%s' % name
+            name, version = item["name"], item["version"]
+            homepage = f"https://rubygems.org/gems/{name}"
             yield name, homepage, cls.name, version

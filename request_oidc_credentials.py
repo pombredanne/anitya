@@ -4,10 +4,11 @@
 import json
 import os.path
 import webbrowser
+
 try:
     # Default to Python 3
-    from http.server import HTTPServer, BaseHTTPRequestHandler
-    from urllib.parse import urlparse, parse_qs
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import parse_qs, urlparse
 except ImportError:
     # Handle running on Python 2 (otherwise we'd just use asyncio)
     from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
@@ -18,15 +19,14 @@ from requests_oauthlib import OAuth2Session
 AUTH_TIMEOUT = 300
 _this_dir = os.path.dirname(__file__)
 SECRETS_FILE = os.path.join(_this_dir, "client_secrets.json")
-CREDENTIALS_FILE = os.path.join(_this_dir,
-                                "anitya",
-                                "tests",
-                                "oidc_credentials.json")
+CREDENTIALS_FILE = os.path.join(_this_dir, "anitya", "tests", "oidc_credentials.json")
 
 
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
     """Callback handler to log the details of received OAuth callbacks"""
+
     def do_GET(self):
+        """do GET"""
         self.server.oauth_callbacks.append(self.path)
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
@@ -36,6 +36,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 
 class OAuthCallbackServer(HTTPServer):
     """Local HTTP server to handle OAuth authentication callbacks"""
+
     def __init__(self, server_address):
         self.oauth_callbacks = []
         HTTPServer.__init__(self, server_address, OAuthCallbackHandler)
@@ -43,7 +44,7 @@ class OAuthCallbackServer(HTTPServer):
 
 def receive_oauth_callback(timeout):
     """Blocking call to wait for a single OAuth authentication callback"""
-    server_address = ('', 5000)
+    server_address = ("", 5000)
     oauthd = OAuthCallbackServer(server_address)
     oauthd.timeout = timeout
     try:
@@ -58,7 +59,8 @@ def receive_oauth_callback(timeout):
 
 
 def main():
-    with open(SECRETS_FILE) as f:
+    """main"""
+    with open(SECRETS_FILE, encoding="utf-8") as f:
         client_details = json.load(f)["web"]
     client_id = client_details["client_id"]
     client_secret = client_details["client_secret"]
@@ -67,7 +69,8 @@ def main():
     token_uri = client_details["token_uri"]
     scopes = (
         # Access user email address for audit trail logging
-        "openid", "email",
+        "openid",
+        "email",
         # Submit new project monitoring requests
         "https://release-monitoring.org/oidc/upstream",
     )
@@ -82,14 +85,11 @@ def main():
     if cb_state != state:
         msg = "Callback state {0!r} didn't match request state {1!r}"
         raise RuntimeError(msg.format(cb_state, state))
-    client_token = oauth.fetch_token(token_uri,
-                                     code=authorization_code,
-                                     client_secret=client_secret)
-    oidc_credentials = {
-        "client_details": client_details,
-        "client_token": client_token
-    }
-    with open(CREDENTIALS_FILE, "w") as f:
+    client_token = oauth.fetch_token(
+        token_uri, code=authorization_code, client_secret=client_secret
+    )
+    oidc_credentials = {"client_details": client_details, "client_token": client_token}
+    with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
         json.dump(oidc_credentials, f)
     print("OIDC client access details saved as " + CREDENTIALS_FILE)
 

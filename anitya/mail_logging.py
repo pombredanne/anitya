@@ -19,13 +19,12 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 Mail handler for logging.
-'''
+"""
+import inspect
 import logging
 import logging.handlers
-
-import inspect
 import os
 import socket
 import traceback
@@ -34,7 +33,9 @@ import flask
 
 psutil = None
 try:
-    import psutil
+    import psutil as _psutil
+
+    psutil = _psutil  # pragma: no cover
 except (OSError, ImportError):  # pragma: no cover
     # We run into issues when trying to import psutil from inside mod_wsgi on
     # rhel7.  If we hit that here, then just fail quietly.
@@ -43,7 +44,7 @@ except (OSError, ImportError):  # pragma: no cover
 
 
 class ContextInjector(logging.Filter):  # pragma: no cover
-    """ Logging filter that adds context to log records.
+    """Logging filter that adds context to log records.
 
     Filters are typically used to "filter" log records.  They declare a filter
     method that can return True or False.  Only records with 'True' will
@@ -56,7 +57,7 @@ class ContextInjector(logging.Filter):  # pragma: no cover
     it when we are emailed error messages.  Seeing an error, but not knowing
     which host it comes from, is not that useful.
 
-    http://docs.python.org/2/howto/logging-cookbook.html#filters-contextual
+    https://docs.python.org/2/howto/logging-cookbook.html#filters-contextual
 
     This code has been originally written by Ralph Bean for the fedmsg
     project:
@@ -67,13 +68,13 @@ class ContextInjector(logging.Filter):  # pragma: no cover
     """
 
     def filter(self, record):
-        """ Set up additional information on the record object. """
+        """Set up additional information on the record object."""
         current_process = ContextInjector.get_current_process()
         current_hostname = socket.gethostname()
 
         record.host = current_hostname
         record.proc = current_process
-        record.pid = '-'
+        record.pid = "-"
         if not isinstance(current_process, str):
             record.pid = current_process.pid
             # Be compatible with python-psutil 1.0 and 2.0, 3.0
@@ -89,10 +90,10 @@ class ContextInjector(logging.Filter):  # pragma: no cover
 
         record.callstack = self.format_callstack()
 
-        record.url = '-'
-        record.args = '-'
-        record.form = '-'
-        record.username = '-'
+        record.url = "-"
+        record.args = "-"
+        record.form = "-"
+        record.username = "-"
         try:
             record.url = flask.request.url
         except RuntimeError:
@@ -103,32 +104,31 @@ class ContextInjector(logging.Filter):  # pragma: no cover
             pass
         try:
             record.form = dict(flask.request.form)
-            if 'csrf_token' in record.form:
-                record.form['csrf_token'] = 'Was present, is cleaned up'
+            if "csrf_token" in record.form:
+                record.form["csrf_token"] = "Was present, is cleaned up"
         except RuntimeError:
             pass
         try:
-            record.username = "%s -- %s" % (
-                flask.g.auth.openid, flask.g.auth.email)
-        except:
+            record.username = f"{flask.g.user.id} -- {flask.g.user.email}"
+        except Exception:
             pass
 
         return True
 
     @staticmethod
     def format_callstack():
-        """ Format the callstack to find out the stack trace. """
+        """Format the callstack to find out the stack trace."""
         ind = 0
         for ind, frame in enumerate(f[0] for f in inspect.stack()):
-            if '__name__' not in frame.f_globals:
+            if "__name__" not in frame.f_globals:
                 continue
-            modname = frame.f_globals['__name__'].split('.')[0]
+            modname = frame.f_globals["__name__"].split(".")[0]
             if modname != "logging":
                 break
 
         def _format_frame(frame):
-            """ Format the frame. """
-            return '  File "%s", line %i in %s\n    %s' % (frame)
+            """Format the frame."""
+            return f'  File "{frame}", line %i in {frame}\n    {frame}'
 
         stack = traceback.extract_stack()
         stack = stack[:-ind]
@@ -136,18 +136,18 @@ class ContextInjector(logging.Filter):  # pragma: no cover
 
     @staticmethod
     def get_current_process():
-        """ Return the current process (PID). """
+        """Return the current process (PID)."""
         mypid = os.getpid()
 
         if not psutil:
-            return "Could not import psutil for %r" % mypid
+            return f"Could not import psutil for {mypid!r}"
 
         for proc in psutil.process_iter():
             if proc.pid == mypid:
                 return proc
 
         # This should be impossible.
-        raise ValueError("Could not find process %r" % mypid)
+        raise ValueError(f"Could not find process {mypid!r}")
 
 
 MSG_FORMAT = """Process Details
@@ -183,13 +183,10 @@ Callstack that lead to the logging statement
 
 
 def get_mail_handler(smtp_server, mail_admin):
-    """ Set up the handler sending emails for big exception
-    """
+    """Set up the handler sending emails for big exception"""
     mail_handler = logging.handlers.SMTPHandler(
-        smtp_server,
-        'nobody@fedoraproject.org',
-        mail_admin,
-        'Anitya (server) error')
+        smtp_server, "nobody@fedoraproject.org", mail_admin, "Anitya (server) error"
+    )
     mail_handler.setFormatter(logging.Formatter(MSG_FORMAT))
     mail_handler.setLevel(logging.ERROR)
     mail_handler.addFilter(ContextInjector())

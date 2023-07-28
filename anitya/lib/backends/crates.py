@@ -2,6 +2,7 @@
 # This file is a part of the Anitya project.
 #
 # Copyright © 2017 Igor Gnatenko <ignatenkobrain@fedoraproject.org>
+# Copyright © 2020 Michal Konecny <mkonecny@redhat.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -109,11 +110,8 @@ from anitya.lib.exceptions import AnityaPluginException
 class CratesBackend(BaseBackend):
     """The crates class for projects hosted on crates.io."""
 
-    name = 'crates.io'
-    examples = [
-        'https://crates.io/crates/clap',
-        'https://crates.io/crates/serde',
-    ]
+    name = "crates.io"
+    examples = ["https://crates.io/crates/clap", "https://crates.io/crates/serde"]
 
     @classmethod
     def _get_versions(cls, project):
@@ -121,7 +119,7 @@ class CratesBackend(BaseBackend):
         Make a request for all versions of the project provided.
 
         Args:
-            project (anitya.lib.model.Project): The Rust project to retrieve
+            project (anitya.lib.anitya.db.models.Project): The Rust project to retrieve
                 versions for.
 
         Returns:
@@ -147,18 +145,21 @@ class CratesBackend(BaseBackend):
             AnityaPluginException: If the URL was unreachable or the response
                 was in an unexpected format.
         """
-        url = 'https://crates.io/api/v1/crates/{}/versions'.format(project.name)
+        url = cls.get_version_url(project)
+        last_change = project.get_time_last_created_version()
         try:
-            req = cls.call_url(url)
+            req = cls.call_url(url, last_change=last_change)
             req.raise_for_status()
+            # Not modified
+            if req.status_code == 304:
+                return []
             data = req.json()
         except requests.RequestException as e:
-            raise AnityaPluginException('Could not contact {url}: '
-                                        '{reason!r}'.format(url=url, reason=e))
+            raise AnityaPluginException(f"Could not contact {url}: {e!r}") from e
         except ValueError as e:
-            raise AnityaPluginException('Failed to decode JSON: {!r}'.format(e))
+            raise AnityaPluginException(f"Failed to decode JSON: {e!r}") from e
 
-        return data['versions']
+        return data["versions"]
 
     @classmethod
     def get_version(cls, project):
@@ -166,7 +167,7 @@ class CratesBackend(BaseBackend):
         Get the latest version of the project provided.
 
         Args:
-            project (anitya.lib.model.Project): The Rust project to retrieve
+            project (anitya.lib.anitya.db.models.Project): The Rust project to retrieve
                 the latest version for.
 
         Returns:
@@ -176,7 +177,23 @@ class CratesBackend(BaseBackend):
             AnityaPluginException: If the URL was unreachable or the response
                 was in an unexpected format.
         """
-        return cls._get_versions(project)[0]['num']
+        return cls._get_versions(project)[0]["num"]
+
+    @classmethod
+    def get_version_url(cls, project):
+        """Method called to retrieve the url used to check for new version
+        of the project provided, project that relies on the backend of this plugin.
+
+        Attributes:
+            project (:obj:`anitya.db.models.Project`): Project object whose backend
+                corresponds to the current plugin.
+
+        Returns:
+            str: url used for version checking
+        """
+        url = f"https://crates.io/api/v1/crates/{project.name}/versions"
+
+        return url
 
     @classmethod
     def get_versions(cls, project):
@@ -184,7 +201,7 @@ class CratesBackend(BaseBackend):
         Get all versions of the project provided.
 
         Args:
-            project (anitya.lib.model.Project): The Rust project to retrieve
+            project (anitya.lib.anitya.db.models.Project): The Rust project to retrieve
                 versions for.
 
         Returns:
@@ -194,7 +211,11 @@ class CratesBackend(BaseBackend):
             AnityaPluginException: If the URL was unreachable or the response
                 was in an unexpected format.
         """
-        return [v['num'] for v in cls._get_versions(project)]
+        filtered_versions = cls.filter_versions(
+            [v["num"] for v in cls._get_versions(project) if not v["yanked"]],
+            project.version_filter,
+        )
+        return filtered_versions
 
     @classmethod
     def get_ordered_versions(cls, project):
@@ -202,7 +223,7 @@ class CratesBackend(BaseBackend):
         Get all versions of the project provided, ordered from newest to oldest.
 
         Args:
-            project (anitya.lib.model.Project): The Rust project to retrieve
+            project (anitya.lib.anitya.db.models.Project): The Rust project to retrieve
                 versions for.
 
         Returns:
@@ -214,3 +235,21 @@ class CratesBackend(BaseBackend):
         """
         # crates API returns already ordered versions
         return cls.get_versions(project)
+
+    @classmethod
+    def check_feed(cls):  # pragma: no cover
+        """Method called to retrieve the latest uploads to a given backend,
+        via, for example, RSS or an API.
+
+        Not Supported
+
+        Returns:
+            :obj:`list`: A list of 4-tuples, containing the project name, homepage, the
+            backend, and the version.
+
+        Raises:
+             NotImplementedError: If backend does not
+                support batch updates.
+
+        """
+        raise NotImplementedError()

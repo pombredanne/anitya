@@ -22,188 +22,233 @@ Base class for Anitya tests.
 """
 from __future__ import print_function
 
-from functools import wraps
-import unittest
 import os
+import unittest
+from contextlib import contextmanager
 
+import flask_login
 import vcr
-import mock
+from flask import request_started
+from social_flask_sqlalchemy.models import PSABase
+from sqlalchemy import create_engine, event
 
-import anitya.lib
-import anitya.lib.model as model
+from anitya import app, config
+from anitya.db import Base, Session, models
 
-#DB_PATH = 'sqlite:///:memory:'
-## A file database is required to check the integrity, don't ask
-DB_PATH = 'sqlite:////tmp/anitya_test.sqlite'
-FAITOUT_URL = 'http://faitout.fedorainfracloud.org/'
-
-if os.environ.get('BUILD_ID'):
-    try:
-        import requests
-        req = requests.get('%s/new' % FAITOUT_URL)
-        if req.status_code == 200:
-            DB_PATH = req.text
-            print('Using faitout at: %s' % DB_PATH)
-    except:
-        pass
+engine = None
 
 
-def skip_jenkins(function):
-    """ Decorator to skip tests if AUTH is set to False """
-    @wraps(function)
-    def decorated_function(*args, **kwargs):
-        """ Decorated function, actually does the work. """
-        ## We used to skip all these tests in jenkins, but now with vcrpy, we
-        ## don't need to.  We can replay the recorded request/response pairs
-        ## for each test from disk.
-        #if os.environ.get('BUILD_ID'):
-        #    raise unittest.SkipTest('Skip backend test on jenkins')
-        return function(*args, **kwargs)
+@contextmanager
+def login_user(app, user):
+    """
+    A context manager to log a user in for testing purposes.
 
-    return decorated_function
+    For example:
+
+        >>> with login_user(self.flask_app, user):
+        ...     self.flask_app.test_client().get('/protected/view')
+
+    The above example will cause the request to ``/protected/view`` to occur with the
+    provided user being authenticated.
+
+    Args:
+        app (flask.Flask): An instance of the Flask application.
+        user (models.User): The user to log in. Note that this user must be committed to the
+            database as it needs a ``user.id`` value.
+    """
+
+    def handler(sender, **kwargs):
+        flask_login.login_user(user)
+
+    with request_started.connected_to(handler, app):
+        yield
 
 
-class Modeltests(unittest.TestCase):
-    """ Model tests. """
-    maxDiff = None
+def _configure_db(db_uri="sqlite://"):
+    """Creates and configures a database engine for the tests to use.
 
-    def __init__(self, method_name='runTest'):
-        """ Constructor. """
-        unittest.TestCase.__init__(self, method_name)
-        self.session = None
+    Args:
+        db_uri (str): The URI to use when creating the engine. This defaults
+            to an in-memory SQLite database.
+    """
+    global engine  # pylint: disable=W0603
+    engine = create_engine(db_uri)
 
-    # pylint: disable=C0103
+    if db_uri.startswith("sqlite://"):
+        # Necessary to get nested transactions working with SQLite. See:
+        # https://docs.sqlalchemy.org/en/latest/dialects/sqlite.html\
+        # #serializable-isolation-savepoints-transactional-ddl
+        @event.listens_for(engine, "connect")
+        def connect_event(dbapi_connection, connection_record):
+            """Stop pysqlite from emitting 'BEGIN'"""
+            # disable pysqlite's emitting of the BEGIN statement entirely.
+            # also stops it from emitting COMMIT before any DDL.
+            dbapi_connection.isolation_level = None
+
+        @event.listens_for(engine, "begin")
+        def begin_event(conn):
+            """Emit our own 'BEGIN' instead of letting pysqlite do it."""
+            conn.execute("BEGIN")
+
+    @event.listens_for(Session, "after_transaction_end")
+    def restart_savepoint(session, transaction):
+        """Allow tests to call rollback on the session."""
+        if (
+            transaction.nested
+            and not transaction._parent.nested  # pylint: disable=W0212
+        ):
+            session.expire_all()
+            session.begin_nested()
+
+
+class AnityaTestCase(unittest.TestCase):
+    """This is the base test case class for Anitya tests."""
+
     def setUp(self):
-        """ Set up the environnment, ran before every tests. """
-        if ':///' in DB_PATH:
-            dbfile = DB_PATH.split(':///')[1]
-            if os.path.exists(dbfile):
-                os.unlink(dbfile)
-        self.session = anitya.lib.init(DB_PATH, create=True, debug=False)
-        mock_query = mock.patch.object(
-            model.BASE, 'query', self.session.query_property(query_cls=model.BaseQuery))
-        mock_query.start()
-        self.addCleanup(mock_query.stop)
+        """Set a basic test environment.
 
-        anitya.lib.plugins.load_plugins(self.session)
+        This simply starts recording a VCR on start-up and stops on tearDown.
+        """
+        self.config = config.config.copy()
+        self.config["TESTING"] = True
+        self.flask_app = app.create(self.config)
+
         cwd = os.path.dirname(os.path.realpath(__file__))
-        self.vcr = vcr.use_cassette(os.path.join(cwd, 'request-data/', self.id()))
+        my_vcr = vcr.VCR(
+            cassette_library_dir=os.path.join(cwd, "request-data/"),
+            record_mode="once",
+            decode_compressed_response=True,
+        )
+        self.vcr = my_vcr.use_cassette(
+            self.id(), filter_headers=[("Authorization", "bearer foobar")]
+        )
         self.vcr.__enter__()
+        self.addCleanup(self.vcr.__exit__, None, None, None)
 
-    # pylint: disable=C0103
+
+class DatabaseTestCase(AnityaTestCase):
+    """The base class for tests that use the database.
+
+    This pattern requires that the database support nested transactions.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        # We don't want our SQLAlchemy session thrown away post-request because that rolls
+        # back the transaction and no database assertions can be made.
+        self.flask_app.teardown_request_funcs = {None: []}
+
+        if engine is None:
+            # In the future we could provide a postgres URI to test against various
+            # databases!
+            _configure_db()
+
+        self.connection = engine.connect()
+        Base.metadata.create_all(bind=self.connection)
+        PSABase.metadata.create_all(bind=self.connection)
+        self.transaction = self.connection.begin()
+
+        Session.remove()
+        Session.configure(bind=self.connection, autoflush=False)
+        self.session = Session()
+
+        # Start a transaction after creating the schema, but before anything is
+        # placed into the database. We'll roll back to the start of this
+        # transaction at the end of every test, and code under test will start
+        # nested transactions
+        self.session.begin_nested()
+
     def tearDown(self):
-        """ Remove the test.db database if there is one. """
-        self.vcr.__exit__()
-
-        if '///' in DB_PATH:
-            dbfile = DB_PATH.split('///')[1]
-            if os.path.exists(dbfile):
-                os.unlink(dbfile)
-
-        self.session.rollback()
+        """Roll back all the changes from the test and clean up the session."""
         self.session.close()
-
-        if DB_PATH.startswith('postgres'):
-            db_name = DB_PATH.rsplit('/', 1)[1]
-            req = requests.get(
-                '%s/clean/%s' % (FAITOUT_URL, db_name))
-            print(req.text)
+        self.transaction.rollback()
+        self.connection.close()
+        Session.remove()
+        super().tearDown()
 
 
 def create_distro(session):
-    """ Create some basic distro for testing. """
-    distro = model.Distro(
-        name='Fedora',
-    )
+    """Create some basic distro for testing."""
+    distro = models.Distro(name="Fedora")
     session.add(distro)
 
-    distro = model.Distro(
-        name='Debian',
-    )
+    distro = models.Distro(name="Debian")
     session.add(distro)
 
     session.commit()
 
 
 def create_project(session):
-    """ Create some basic projects to work with. """
-    anitya.lib.create_project(
-        session,
-        name='geany',
-        homepage='http://www.geany.org/',
-        version_url='http://www.geany.org/Download/Releases',
-        regex='DEFAULT',
-        user_id='noreply@fedoraproject.org',
+    """Create some basic projects to work with."""
+    project = models.Project(
+        name="geany",
+        homepage="https://www.geany.org/",
+        version_scheme="RPM",
+        backend="custom",
+        version_url="https://www.geany.org/Download/Releases",
+        regex="DEFAULT",
     )
+    session.add(project)
 
-    anitya.lib.create_project(
-        session,
-        name='subsurface',
-        homepage='http://subsurface.hohndel.org/',
-        version_url='http://subsurface.hohndel.org/downloads/',
-        regex='DEFAULT',
-        user_id='noreply@fedoraproject.org',
+    project = models.Project(
+        name="subsurface",
+        homepage="https://subsurface-divelog.org/",
+        backend="custom",
+        version_url="https://subsurface-divelog.org/downloads/",
+        regex="DEFAULT",
     )
+    session.add(project)
 
-    anitya.lib.create_project(
-        session,
-        name='R2spec',
-        homepage='https://fedorahosted.org/r2spec/',
-        user_id='noreply@fedoraproject.org',
+    project = models.Project(
+        name="R2spec", homepage="https://fedorahosted.org/r2spec/", backend="custom"
     )
+    session.add(project)
+    session.commit()
 
 
 def create_ecosystem_projects(session):
-    """ Create some fake projects from particular upstream ecosystems
+    """Create some fake projects from particular upstream ecosystems
 
     Each project name is used in two different ecosystems
     """
-    anitya.lib.create_project(
-        session,
-        name='pypi_and_npm',
-        homepage='https://example.com/not-a-real-pypi-project',
-        backend='PyPI',
-        user_id='noreply@fedoraproject.org'
+    project = models.Project(
+        name="pypi_and_npm",
+        homepage="https://example.com/not-a-real-pypi-project",
+        backend="PyPI",
     )
+    session.add(project)
 
-    anitya.lib.create_project(
-        session,
-        name='pypi_and_npm',
-        homepage='https://example.com/not-a-real-npmjs-project',
-        backend='npmjs',
-        user_id='noreply@fedoraproject.org'
+    project = models.Project(
+        name="pypi_and_npm",
+        homepage="https://example.com/not-a-real-npmjs-project",
+        backend="npmjs",
     )
+    session.add(project)
 
-    anitya.lib.create_project(
-        session,
-        name='rubygems_and_maven',
-        homepage='https://example.com/not-a-real-rubygems-project',
-        backend='Rubygems',
-        user_id='noreply@fedoraproject.org'
+    project = models.Project(
+        name="rubygems_and_maven",
+        homepage="https://example.com/not-a-real-rubygems-project",
+        backend="Rubygems",
     )
+    session.add(project)
 
-    anitya.lib.create_project(
-        session,
-        name='rubygems_and_maven',
-        homepage='https://example.com/not-a-real-maven-project',
-        backend='Maven Central',
-        user_id='noreply@fedoraproject.org'
+    project = models.Project(
+        name="rubygems_and_maven",
+        homepage="https://example.com/not-a-real-maven-project",
+        backend="Maven Central",
     )
+    session.add(project)
+    session.commit()
 
 
 def create_package(session):
-    """ Create some basic packages to work with. """
-    package = model.Packages(
-        project_id=1,
-        distro='Fedora',
-        package_name='geany',
-    )
+    """Create some basic packages to work with."""
+    package = models.Packages(project_id=1, distro_name="Fedora", package_name="geany")
     session.add(package)
 
-    package = model.Packages(
-        project_id=2,
-        distro='Fedora',
-        package_name='subsurface',
+    package = models.Packages(
+        project_id=2, distro_name="Fedora", package_name="subsurface"
     )
     session.add(package)
 
@@ -211,31 +256,23 @@ def create_package(session):
 
 
 def create_flagged_project(session):
-    """ Create and flag a project. Returns the ProjectFlag. """
-    project = anitya.lib.create_project(
-        session,
-        name='geany',
-        homepage='http://www.geany.org/',
-        version_url='http://www.geany.org/Download/Releases',
-        regex='DEFAULT',
-        user_id='noreply@fedoraproject.org',
+    """Create and flag a project. Returns the ProjectFlag."""
+    project = models.Project(
+        name="geany",
+        homepage="https://www.geany.org/",
+        version_url="https://www.geany.org/Download/Releases",
+        regex="DEFAULT",
     )
-
     session.add(project)
 
-    flag = anitya.lib.flag_project(
-        session,
-        project,
-        "This is a duplicate.",
-        "dgay@redhat.com",
-        "user_openid_id",
+    flag = models.ProjectFlag(
+        project=project, reason="this is a duplicate.", user="dgay@redhat.com"
     )
-
     session.add(flag)
 
     session.commit()
     return flag
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -19,25 +19,47 @@
 # of Red Hat, Inc.
 #
 
-'''
+"""
 anitya tests of the plugins.
-'''
+"""
 
-import datetime
 import unittest
 
 from anitya.lib import plugins
-from anitya.lib import model
 from anitya.lib.versions import Version
-from anitya.tests.base import Modeltests
+from anitya.tests.base import DatabaseTestCase
 
 EXPECTED_BACKENDS = [
-    'BitBucket', 'CPAN (perl)', 'crates.io', 'Debian project', 'Drupal6',
-    'Drupal7', 'Freshmeat',
-    'GNOME', 'GNU project', 'GitHub', 'Google code', 'Hackage',
-    'Launchpad', 'Maven Central', 'PEAR', 'PECL', 'Packagist', 'PyPI',
-    'Rubygems', 'Sourceforge', 'Stackage', 'custom', 'folder', 'npmjs',
-    'pagure',
+    "BitBucket",
+    "Cgit",
+    "CPAN (perl)",
+    "CRAN (R)",
+    "crates.io",
+    "Debian project",
+    "Drupal6",
+    "Drupal7",
+    "Freshmeat",
+    "GNOME",
+    "GNU project",
+    "Gogs",
+    "GitHub",
+    "GitLab",
+    "Hackage",
+    "Launchpad",
+    "Maven Central",
+    "PEAR",
+    "PECL",
+    "Packagist",
+    "PyPI",
+    "Rubygems",
+    "Sourceforge",
+    "Sourceforge (git)",
+    "SourceHut",
+    "Stackage",
+    "custom",
+    "folder",
+    "npmjs",
+    "pagure",
 ]
 
 EXPECTED_ECOSYSTEMS = {
@@ -48,25 +70,29 @@ EXPECTED_ECOSYSTEMS = {
     "crates.io": "crates.io",
 }
 
+EXPECTED_VERSIONS = ["RPM", "Calendar", "Python (PEP 440)", "Semantic"]
+
 
 class VersionPluginsTests(unittest.TestCase):
     """Tests for the version scheme plugins."""
 
     def test_version_plugin_names(self):
+        """Test version plugin names"""
         plugin_names = plugins.VERSION_PLUGINS.get_plugin_names()
-        self.assertEqual(['RPM'], plugin_names)
+        self.assertEqual(sorted(EXPECTED_VERSIONS), sorted(plugin_names))
 
     def test_version_plugin_classes(self):
+        """Test version plugin classes"""
         version_plugins = plugins.VERSION_PLUGINS.get_plugins()
         for plugin in version_plugins:
             self.assertTrue(issubclass(plugin, Version))
 
 
-class Pluginstests(Modeltests):
-    """ Plugins tests. """
+class Pluginstests(DatabaseTestCase):
+    """Plugins tests."""
 
     def test_load_all_plugins(self):
-        """ Test the plugins.load_all_plugins function. """
+        """Test the plugins.load_all_plugins function."""
         all_plugins = plugins.load_all_plugins(self.session)
         backend_plugins = all_plugins["backends"]
         self.assertEqual(len(backend_plugins), len(EXPECTED_BACKENDS))
@@ -74,30 +100,30 @@ class Pluginstests(Modeltests):
         self.assertEqual(sorted(backend_names), sorted(EXPECTED_BACKENDS))
 
         ecosystem_plugins = all_plugins["ecosystems"]
-        ecosystems = dict((plugin.name, plugin.default_backend)
-                              for plugin in ecosystem_plugins)
+        ecosystems = dict(
+            (plugin.name, plugin.default_backend) for plugin in ecosystem_plugins
+        )
         self.assertEqual(ecosystems, EXPECTED_ECOSYSTEMS)
 
     def test_load_plugins(self):
-        """ Test the plugins.load_plugins function. """
+        """Test the plugins.load_plugins function."""
         backend_plugins = plugins.load_plugins(self.session)
         self.assertEqual(len(backend_plugins), len(EXPECTED_BACKENDS))
         backend_names = sorted(plugin.name for plugin in backend_plugins)
         self.assertEqual(sorted(backend_names), sorted(EXPECTED_BACKENDS))
 
     def test_plugins_get_plugin_names(self):
-        """ Test the plugins.get_plugin_names function. """
+        """Test the plugins.get_plugin_names function."""
         plugin_names = plugins.get_plugin_names()
         self.assertEqual(len(plugin_names), len(EXPECTED_BACKENDS))
         self.assertEqual(sorted(plugin_names), sorted(EXPECTED_BACKENDS))
 
     def test_plugins_get_plugin(self):
-        """ Test the plugins.get_plugin function. """
-        plugin = plugins.get_plugin('PyPI')
-        self.assertEqual(
-            str(plugin), "<class 'anitya.lib.backends.pypi.PypiBackend'>")
+        """Test the plugins.get_plugin function."""
+        plugin = plugins.get_plugin("PyPI")
+        self.assertEqual(str(plugin), "<class 'anitya.lib.backends.pypi.PypiBackend'>")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     SUITE = unittest.TestLoader().loadTestsFromTestCase(Pluginstests)
     unittest.TextTestRunner(verbosity=2).run(SUITE)

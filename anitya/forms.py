@@ -2,68 +2,102 @@
 
 """ Forms used in anitya. """
 
-from wtforms import TextField, TextAreaField, validators, SelectField
-from wtforms import BooleanField
+from wtforms import BooleanField, SelectField, StringField, TextAreaField, validators
 
 from anitya.compat import FlaskForm
 
 
-class ProjectForm(FlaskForm):
-    name = TextField('Project name', [validators.Required()])
-    homepage = TextField(
-        'Homepage', [validators.Required(), validators.URL()])
-    backend = SelectField(
-        'Backend',
-        [validators.Required()],
-        choices=[(item, item) for item in []]
-    )
-    version_url = TextField('Version URL', [validators.optional()])
-    version_prefix = TextField('Version prefix', [validators.optional()])
-    regex = TextField('Regex', [validators.optional()])
-    insecure = BooleanField(
-        'Use insecure connection', [validators.optional()])
+class TokenForm(FlaskForm):
+    """
+    Form for API tokens.
 
-    distro = TextField('Distro (optional)', [validators.optional()])
-    package_name = TextField('Package (optional)', [validators.optional()])
+    Attributes:
+        description (StringField): The human-readable API token description, useful
+            for users to describe the token's purpose.
+    """
+
+    description = StringField("Token description", [validators.optional()])
+
+
+class ProjectForm(FlaskForm):
+    """ProjectForm"""
+
+    name = StringField("Project name", [validators.DataRequired()])
+    homepage = StringField("Homepage", [validators.DataRequired(), validators.URL()])
+    backend = SelectField("Backend", [validators.DataRequired()], choices=[])
+    version_url = StringField("Version URL", [validators.optional()])
+    version_prefix = StringField("Version prefix", [validators.optional()])
+    pre_release_filter = StringField("Pre-release filter", [validators.optional()])
+    version_filter = StringField("Version filter", [validators.optional()])
+    version_scheme = SelectField(
+        "Version scheme", [validators.InputRequired()], choices=[]
+    )
+    version_pattern = StringField("Version pattern", [validators.optional()])
+    regex = StringField("Regex", [validators.optional()])
+    insecure = BooleanField("Use insecure connection", [validators.optional()])
+
+    distro = SelectField("Distro (optional)", [validators.optional()], choices=[])
+    package_name = StringField("Package (optional)", [validators.optional()])
     check_release = BooleanField(
-        'Check latest release on submit', [validators.optional()])
+        "Check latest release on submit", [validators.optional()]
+    )
+    releases_only = BooleanField(
+        "Check releases instead of tags", [validators.optional()]
+    )
 
     def __init__(self, *args, **kwargs):
-        """ Calls the default constructor with the normal argument but
+        """Calls the default constructor with the normal argument but
         uses the list of backends provided to fill the choices of the
         drop-down list.
         """
-        super(ProjectForm, self).__init__(*args, **kwargs)
-        if 'backends' in kwargs:
+        super().__init__(*args, **kwargs)
+        if "backends" in kwargs:
             self.backend.choices = [
-                (backend, backend) for backend in sorted(kwargs['backends'])
+                (backend, backend) for backend in sorted(kwargs["backends"])
             ]
+        if "version_schemes" in kwargs:
+            self.version_scheme.choices = [
+                (version_scheme, version_scheme)
+                for version_scheme in sorted(kwargs["version_schemes"])
+            ]
+        if "distros" in kwargs:
+            self.distro.choices = [
+                (distro, distro)
+                for distro in sorted(kwargs["distros"], key=lambda s: s.lower())
+            ]
+            self.distro.choices.insert(0, ("", ""))
 
 
 class FlagProjectForm(FlaskForm):
-    reason = TextAreaField('Reason for flagging', [validators.Required()])
+    """FlagProjectForm"""
+
+    reason = TextAreaField("Reason for flagging", [validators.DataRequired()])
 
 
 class MappingForm(FlaskForm):
-    distro = TextField('Distribution', [validators.Required()])
-    package_name = TextField('Package name', [validators.Required()])
+    """MappingForm"""
+
+    distro = SelectField("Distribution", [validators.DataRequired()], choices=[])
+    package_name = StringField("Package name", [validators.DataRequired()])
 
     def __init__(self, *args, **kwargs):
-        """ Calls the default constructor and fill in additional information.
-        """
-        super(MappingForm, self).__init__(*args, **kwargs)
+        """Calls the default constructor and fill in additional information."""
+        super().__init__(*args, **kwargs)
 
-        if 'package' in kwargs:
-            package = kwargs['package']
-            self.distro.data = package.distro
-            self.package_name.data = package.package_name
-            self.version_url.data = package.version_url
-            self.regex.data = package.regex
+        if "distros" in kwargs:
+            self.distro.choices = [
+                (distro, distro)
+                for distro in sorted(kwargs["distros"], key=lambda s: s.lower())
+            ]
 
 
 class ConfirmationForm(FlaskForm):
+    """ConfirmationForm"""
+
     pass
 
 
 class DistroForm(FlaskForm):
-    name = TextField('Distribution name', [validators.Required()])
+    """DistroForm"""
+
+    name = StringField("Distribution name", [validators.DataRequired()])

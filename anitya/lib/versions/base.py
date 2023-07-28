@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright © 2017  Red Hat, Inc.
+# Copyright © 2017-2020 Red Hat, Inc.
 #
 # This copyrighted material is made available to anyone wishing to use,
 # modify, copy, or redistribute it subject to the terms and conditions
@@ -17,27 +17,72 @@
 # code or documentation are not subject to the GNU General Public
 # License and may only be used or replicated with the express permission
 # of Red Hat, Inc.
+"""The Anitya versions API."""
+
 from __future__ import unicode_literals
 
 import functools
 import re
+from datetime import datetime
+from typing import Optional
 
 from anitya.lib.exceptions import InvalidVersion
 
-
 #: A regular expression to determine if the version string contains a 'v' prefix.
-v_prefix = re.compile(r'v\d.*')
+v_prefix = re.compile(r"v\d.*")
 
 
 @functools.total_ordering
 class Version(object):
     """The base class for versions."""
 
-    name = 'Generic Version'
+    name = "Generic Version"
 
-    def __init__(self, version=None, prefix=None):
+    def __init__(
+        self,
+        version: Optional[str] = None,
+        prefix: Optional[str] = None,
+        created_on: Optional[datetime] = None,
+        pattern: Optional[str] = None,
+        cursor: Optional[str] = None,
+        commit_url: Optional[str] = None,
+        pre_release_filter: Optional[str] = None,
+    ):
+        """
+        Constructor of Version class.
+
+        Params:
+            version: Raw version
+            prefix: Prefix to remove
+            created_on: Date of creation
+            pattern: Calendar version pattern.
+                See `Calendar version scheme_` for more information.
+            cursor: An opaque, backend-specific cursor pointing to the version.
+            commit_url: A URL pointing to the commit tagged as the version.
+            pre_release_filter: A filter used to identify pre-release versions
+        """
         self.version = version
-        self.prefix = prefix
+        if prefix:
+            self.prefixes = prefix.split(";")
+            # Sort from shorter to longest, this will prevent stripping
+            # shorter prefix instead of larger.
+            # For example:
+            # version = release_db-1.2.3
+            # prefixes = release_db-;release
+            # would return db-1.2.3 instead of 1.2.3 if the sort is not done
+            self.prefixes.sort(key=len)
+        else:
+            self.prefixes = []
+        self.created_on = created_on
+        self.pattern = None
+        if pattern:
+            self.pattern = pattern.upper()
+        self.cursor = cursor
+        self.commit_url = commit_url
+        if pre_release_filter:
+            self.pre_release_filters = pre_release_filter.split(";")
+        else:
+            self.pre_release_filters = []
 
     def __str__(self):
         """
@@ -59,16 +104,17 @@ class Version(object):
         Returns:
             str: The version string. Sub-classes may return a different type.
             object: Sub-classes may return a special class that represents the
-                version. This must support comparison operations and return
-                a parsed, prefix-stripped version when ``__str__`` is invoked.
+            version. This must support comparison operations and return
+            a parsed, prefix-stripped version when ``__str__`` is invoked.
 
         Raises:
             InvalidVersion: If the version cannot be parsed.
         """
         # If there's a prefix set on the project, strip it if it's present
         version = self.version
-        if self.prefix and self.version.startswith(self.prefix):
-            version = self.version[len(self.prefix):]
+        for prefix in self.prefixes:
+            if prefix and self.version.startswith(prefix):
+                version = self.version[len(prefix) :].strip()
 
         # Many projects prefix their tags with 'v', so strip it if it's present
         if v_prefix.match(version):
@@ -123,7 +169,9 @@ class Version(object):
             if not isinstance(version, type(self)):
                 version = type(self)(version=version)
             cast_versions.append(version)
-        return all([self.parse() > v.parse() for v in cast_versions])
+        return all(  # pylint: disable=R1729
+            [self.parse() > v.parse() for v in cast_versions]
+        )
 
     def __lt__(self, other):
         """Support < comparison via objects returned from :meth:`parse`"""

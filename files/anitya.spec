@@ -16,11 +16,8 @@ BuildArch:      noarch
 BuildRequires:  python2-devel
 BuildRequires:  python-flask
 BuildRequires:  python-flask-wtf
-BuildRequires:  python-flask-openid
 BuildRequires:  python-wtforms
-BuildRequires:  python-openid
 BuildRequires:  python-dateutil
-BuildRequires:  python-bunch
 BuildRequires:  python-straight-plugin
 BuildRequires:  python-setuptools
 BuildRequires:  fedmsg
@@ -37,11 +34,8 @@ Requires:  python-sqlalchemy > 0.7
 Requires:  python-alembic
 Requires:  python-flask
 Requires:  python-flask-wtf
-Requires:  python-flask-openid
 Requires:  python-wtforms
-Requires:  python-openid
 Requires:  python-dateutil
-Requires:  python-bunch
 Requires:  python-straight-plugin
 Requires:  python-setuptools
 Requires:  mod_wsgi

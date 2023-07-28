@@ -1,6 +1,5 @@
-#!/usr/bin/python
-import sys, os
-sys.path.insert (0,'/opt/anitya/src')
-os.chdir('/opt/anitya/src')
-
-from anitya.app import APP as application
+""" WSGI application """
+# This file represents the WSGI application that could be served
+# by any web server application like Apache or Flask
+# pylint: disable=W0611
+from anitya.wsgi import application  # noqa: F401

@@ -1,19 +1,22 @@
 # This is a TOML-format file. For the spec, see https://github.com/toml-lang/toml#spec
 
 # URL to the database
-db_url = 'postgresql://postgres:anypasswordworkslocally@localhost/anitya'
+db_url = 'postgresql://postgres:anypasswordworkslocally@postgres/anitya'
 
-# List of admins based on their openid
-# anitya_web_admins = ["http://pingou.id.fedoraproject.org/"]
+# List of web administrators. The values should be the value of the "id" column
+# for the user in the "users" table of the database. They need to log in before
+# this record is created. An example value would be
+# "65536ed7-bdd3-4a1e-8252-10d874fd706b"
+# You can also find this infromation in the settings page when logged in to Anitya
+anitya_web_admins = []
 
 # A set of booleans to enable or disable OpenID providers
 anitya_web_fedora_openid = "https://id.fedoraproject.org"
-anitya_web_allow_fas_openid = true
-anitya_web_allow_google_openid = true
-anitya_web_allow_yahoo_openid = true
-anitya_web_allow_generic_openid = true
+social_auth_redirect_is_https = false
 
 blacklisted_users = []
+
+sse_feed = "http://firehose.libraries.io/events"
 
 # The logging configuration, in dictConfig format.
 [anitya_log_config]
@@ -32,7 +35,7 @@ blacklisted_users = []
 
     [anitya_log_config.loggers]
         [anitya_log_config.loggers.anitya]
-            level = "INFO"
+            level = "DEBUG"
             propagate = false
             handlers = ["console"]
 
