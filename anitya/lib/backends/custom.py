@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014 - Copyright Red Hat Inc
+(c) 2014 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
 
 """
 
@@ -31,6 +31,7 @@ class CustomBackend(BaseBackend):
         "user-guide.html#regular-expressions</a>"
     )
     default_regex = REGEX % {"name": "{project name}"}
+    required_version_url = True
 
     @classmethod
     def get_version_url(cls, project):

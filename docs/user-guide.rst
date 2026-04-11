@@ -164,6 +164,15 @@ The backends available are:
   You need to provide **GitLab project url** which needs to point to project root on
   GitLab server.
 
+* **Gitea** for projects hosted on
+  `Gitea server <https://docs.gitea.com/>`_.
+  This backend can also be used for projects that are hosted on 
+  `Forgejo server <https://forgejo.org/>`_ as Forgejo API is one-to-one compatible with
+  Gitea API.
+
+  You need to provide **Gitea/Forgejo project url** which needs to point to project root on
+  either Gitea server or Forgejo server.
+
 * **GNOME** for projects hosted on
   `download.gnome.org <https://download.gnome.org/sources/>`_
 
@@ -287,6 +296,32 @@ Anitya provides several different versions schemes.
     recent scheme and the rest will be moved to bottom unsorted.
 
 
+Version Pattern
+===============
+
+The version pattern is used to define how the calendar version should be
+parsed and how they will be sorted. It allows for specifying the format 
+for calendar versioning scheme using following patterns.
+
+Patterns -
+
+- ``YYYY``: Full year (e.g., 2006, 2016, 2106).
+- ``YY``: Short year (e.g., 6, 16, 106).
+- ``0Y``: Zero-padded year (e.g., 06, 16, 106).
+- ``MM``: Short month (e.g., 1, 2, ..., 11, 12).
+- ``0M``: Zero-padded month (e.g., 01, 02, ..., 11, 12).
+- ``WW``: Short week (since the start of the year) (e.g., 1, 2, 33, 52).
+- ``0W``: Zero-padded week (e.g., 01, 02, 33, 52).
+- ``DD``: Short day (e.g., 1, 2, ..., 30, 31).
+- ``0D``: Zero-padded day (e.g., 01, 02, ..., 30, 31).
+
+.. note::
+    Traditional, incremented version numbers are 0-based, whereas date
+    segments are 1-based, and the short and zero-padded years are relative
+    to the year 2000. Usage of weeks is usually mutually exclusive
+    with months/days.
+
+
 Version Prefix
 --------------
 
@@ -317,15 +352,27 @@ More concrete examples:
 Pre-release filter
 ------------------
 
-Sometimes the recognition of stable and unstable versions by :ref:`version-scheme` isn't
-working for the project and in this field you can specify strings that will be considered
-as unstable release.
+Anitya will attempt recognition of stable and unstable versions for projects
+using :ref:`version schemes <version-scheme>`. Sometimes recognition may not
+work for a project and in this field a user can specify strings that will be
+considered as unstable release.
 
 For example, if the project's version are: ``1.2alpha``, you can set the
 pre-release filter to ``alpha`` to tell Anitya to treat this release as unstable.
 
 You can specify multiple filters by separating them by ``;``. For example
 ``alpha;beta`` will mark versions with ``alpha`` and ``beta`` as unstable.
+
+For projects using odd-numbered versions for development releases, the filter
+pattern ``!odds[:n]`` can be used to help identify development releases as
+pre-releases. For projects which use an odd minor version to identify
+development releases, a filter ``!odds`` can be used (e.g. versions ``1.0`` and
+``1.2`` is considered a stable version, where ``1.1`` is considered a
+pre-release version). For projects which use a different field as a marker for
+old versions, an offset value (``n``) can be provided. For example, the filter
+``!odds:2`` can be used to configure an odd micro version to identify
+development releases (e.g. versions ``1.0.4`` and ``1.0.6`` is considered a
+stable version, where ``1.0.5`` is considered a pre-release version).
 
 .. note::
    This filter is applied after recognition of unstable versions by :ref:`version-scheme`.
@@ -445,6 +492,17 @@ To add a new mapping of the project to distribution you can use **Add new distri
 under the *Mappings* table on project page.
 
 This opens a new page which allows you to add a new mapping for the distribution of your choice.
+
+Before you start to create a new distribution, there are some things worth considering:
+
+* Don't create a new distribution for a distribution flavour (or at least double check 
+  if it is really required), since it most likely follow the same naming scheme for 
+  packages (i.e. openSUSE Leap or openSUSE Tumbleweed will use the openSUSE naming scheme,
+  making the openSUSE distribution a better choice for both).
+
+* Call it something unique, you don't want the distribution to be
+  confused, since other people might start to use your mapping for
+  a purpose you didn't intend it for.
 
 
 Distribution

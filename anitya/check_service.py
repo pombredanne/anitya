@@ -91,19 +91,24 @@ class Checker:
         session = db.Session()
         project = db.Project.query.filter(db.Project.id == project_id).one()
         if project.backend in self.blacklist_dict:
-            self.blacklist_project(project, self.blacklist_dict[project.backend])
-            _log.info(
-                "%s: Backend is blacklisted. Rescheduling to %s",
-                project.name,
-                self.blacklist_dict[project.backend],
-            )
-            project.next_check = self.blacklist_dict[project.backend]
-            session.add(project)
-            session.commit()
-            return
+            if arrow.utcnow().datetime < self.blacklist_dict[project.backend]:
+                self.blacklist_project(project, self.blacklist_dict[project.backend])
+                _log.info(
+                    "%s: Backend is blacklisted. Rescheduling to %s",
+                    project.name,
+                    self.blacklist_dict[project.backend],
+                )
+                project.next_check = self.blacklist_dict[project.backend]
+                session.add(project)
+                session.commit()
+                return
+            else:
+                with self.blacklist_dict_lock:
+                    self.blacklist_dict.pop(project.backend)
         try:
             _log.debug("Checking project %s", project.name)
             utilities.check_project_release(project, session)
+            _log.debug("Project check complete %s", project.name)
         except RateLimitException as err:
             self.blacklist_project(project, err.reset_time)
             return

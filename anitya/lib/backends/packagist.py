@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2020 - Copyright Red Hat Inc
+(c) 2014-2020 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-   Michal Konecny <mkonecny@redhat.com>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
+  Michal Konecny <mkonecny@redhat.com>
 
 """
-
 
 from anitya.lib.backends import BaseBackend
 from anitya.lib.exceptions import AnityaPluginException

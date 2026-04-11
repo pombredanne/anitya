@@ -5,6 +5,7 @@ Revision ID: a52d2fe99d4f
 Revises: 8040ef9a9dda
 Create Date: 2017-07-06 18:08:56.027650
 """
+
 import uuid
 
 import sqlalchemy as sa
@@ -62,10 +63,10 @@ class GUID(TypeDecorator):  # pylint: disable=W0223
             return str(value)
         else:
             if not isinstance(value, uuid.UUID):
-                return f"{uuid.UUID(value).int:032x}"
+                return f"{uuid.UUID(value).int:032x}"  # noqa: E231
             else:
                 # hexstring
-                return f"{value.int:032x}"
+                return f"{value.int:032x}"  # noqa: E231
 
     def process_result_value(self, value, dialect):
         """

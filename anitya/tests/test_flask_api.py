@@ -326,7 +326,7 @@ class AnityaWebAPItests(DatabaseTestCase):
         exp = {
             "error": [
                 "geany: no upstream version found. "
-                "- https://www.geany.org/Down - "
+                "- https://www.geany.org/Down -"
                 " " + REGEX % ({"name": "geany"})
             ],
             "output": "notok",
@@ -504,8 +504,10 @@ class AnityaWebAPItests(DatabaseTestCase):
             "stable_versions": [],
             "packages": [],
         }
-
         self.assertEqual(data, exp)
+
+        output = self.app.get("/api/by_ecosystem/pypi/uppercase_name")
+        self.assertEqual(output.status_code, 200)
 
 
 if __name__ == "__main__":

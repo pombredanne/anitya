@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2020 - Copyright Red Hat Inc
+(c) 2014-2020 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-   Ralph Bean <rbean@redhat.com>
-   Michal Konecny <mkonecny@redhat.com>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
+  Ralph Bean <rbean@redhat.com>
+  Michal Konecny <mkonecny@redhat.com>
 
 """
 
@@ -35,7 +35,7 @@ class RubygemsBackend(BaseBackend):
         Returns:
             str: url used for version checking
         """
-        url = f"https://rubygems.org/api/v1/versions/{project.name}/latest.json"
+        url = f"https://rubygems.org/api/v1/versions/{project.name}/latest.json"  # noqa: E231
 
         return url
 
@@ -103,5 +103,5 @@ class RubygemsBackend(BaseBackend):
 
         for item in data:
             name, version = item["name"], item["version"]
-            homepage = f"https://rubygems.org/gems/{name}"
+            homepage = f"https://rubygems.org/gems/{name}"  # noqa: E231
             yield name, homepage, cls.name, version

@@ -22,6 +22,7 @@ Revision ID: 3fae8239eeec
 Revises: feeaa70ead67
 Create Date: 2017-07-31 20:13:54.179584
 """
+
 import uuid
 
 import sqlalchemy as sa
@@ -79,10 +80,10 @@ class GUID(TypeDecorator):  # pylint: disable=W0223
             return str(value)
         else:
             if not isinstance(value, uuid.UUID):
-                return f"{uuid.UUID(value).int:032x}"
+                return f"{uuid.UUID(value).int:032x}"  # noqa: E231
             else:
                 # hexstring
-                return f"{value.int:032x}"
+                return f"{value.int:032x}"  # noqa: E231
 
     def process_result_value(self, value, dialect):
         """

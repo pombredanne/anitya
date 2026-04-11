@@ -4,6 +4,235 @@ Release Notes
 
 .. towncrier release notes start
 
+2.1.0 (2026-01-29)
+==================
+
+API Changes
+-----------
+
+* Lookups by ecosystem are now case insensitive
+  (`#1980 <https://github.com/fedora-infra/anitya/issues/1980>`_)
+
+
+Features
+--------
+
+* Implement dark mode via Bootstrap 5.3
+  (`#1937 <https://github.com/fedora-infra/anitya/issues/1937>`_)
+
+
+Bug Fixes
+---------
+
+* Remove ratelimit threshold for GitHub
+  (`PR#1968 <https://github.com/fedora-infra/anitya/pull/1968>`_)
+
+* Check the blacklisted packages on reset_time
+  (`PR#1969 <https://github.com/fedora-infra/anitya/pull/1969>`_)
+
+
+Development Changes
+-------------------
+
+* Add support for python 3.14
+  (`PR#1970 <https://github.com/fedora-infra/anitya/pull/1970>`_)
+
+
+Contributors
+------------
+Many thanks to the contributors of bug reports, pull requests, and pull request
+reviews for this release:
+
+* Avindra Goolcharan
+* Anatoli Babenia
+* Justin Zobel
+* Michal Konecny
+
+2.0.3 (2025-09-05)
+==================
+
+API Changes
+-----------
+
+* Fix: Should not allow projects with no way to check versions
+  (`#1921 <https://github.com/fedora-infra/anitya/issues/1921>`_)
+
+
+Other Changes
+-------------
+
+* Update copyright to 2025
+  (`#1930 <https://github.com/fedora-infra/anitya/issues/1930>`_)
+
+
+Contributors
+------------
+Many thanks to the contributors of bug reports, pull requests, and pull request
+reviews for this release:
+
+* Justin Zobel
+* Michal Konecny
+
+
+2.0.2 (2025-07-30)
+==================
+
+Bug Fixes
+---------
+
+* Fix: Internal server error when adding packages
+  (`#1911 <https://github.com/fedora-infra/anitya/issues/1911>`_)
+
+
+Contributors
+------------
+Many thanks to the contributors of bug reports, pull requests, and pull request
+reviews for this release.
+
+
+2.0.1 (2025-07-03)
+==================
+
+Bug Fixes
+---------
+
+* You are going to be blocked from scraping MetaCPAN.org
+  (`#1900 <https://github.com/fedora-infra/anitya/issues/1900>`_)
+
+* Fix api_v2 returning 500
+  (`#1906 <https://github.com/fedora-infra/anitya/issues/1906>`_)
+
+
+Development Changes
+-------------------
+
+* Update dev environment to latest fedora release
+  (`#1909 <https://github.com/fedora-infra/anitya/issues/1909>`_)
+
+
+Other Changes
+-------------
+
+* Update documentation for APIv2
+  (`PR#1891 <https://github.com/fedora-infra/anitya/pull/1891>`_)
+
+
+Contributors
+------------
+Many thanks to the contributors of bug reports, pull requests, and pull request
+reviews for this release:
+
+* Anton Medvedev
+* Peter Oliver
+* Michal Konecny
+* Alex Mayer
+
+2.0.0 (2025-01-10)
+==================
+
+Features
+--------
+
+* Migrate from social_auth to authlib
+  (`#1139 <https://github.com/fedora-infra/anitya/issues/1139>`_)
+
+  WARNING: This removes social_auth tables from Anitya, which can't be recovered back.
+  Thus making this version backwards incompatible.
+
+Development Changes
+-------------------
+
+* Improve development container
+  (`#1859 <https://github.com/fedora-infra/anitya/issues/1859>`_)
+
+* Remove Vagrant dev environemnt
+  (`#1860 <https://github.com/fedora-infra/anitya/issues/1860>`_)
+
+Contributors
+------------
+Many thanks to the contributors of bug reports, pull requests, and pull request
+reviews for this release:
+
+* Lenka Segura
+* Michal Konecny
+
+
+1.10.0 (2024-05-29)
+===================
+
+Features
+--------
+
+* Add option to delete user to users management page
+  (`#931 <https://github.com/fedora-infra/anitya/issues/931>`_)
+
+* Sort search by a "clickable" 'name' 'homepage' 'backend' 'latest version'
+  (`#1627 <https://github.com/fedora-infra/anitya/issues/1627>`_)
+
+
+Bug Fixes
+---------
+
+* Error when uuid object is returned from Fedora Account System
+  (`#1727 <https://github.com/fedora-infra/anitya/issues/1727>`_)
+
+
+Development Changes
+-------------------
+
+* Remove `straight.plugin` dependency
+  (`#1769 <https://github.com/fedora-infra/anitya/issues/1769>`_)
+
+
+Other Changes
+-------------
+
+* Added instructions for configuring `social_sqlalchemy` in Anitya to the contributing guidelines.
+  (`#1723 <https://github.com/fedora-infra/anitya/issues/1723>`_)
+
+
+Contributors
+------------
+Many thanks to the contributors of bug reports, pull requests, and pull request
+reviews for this release:
+
+* Vidit Maheshwari
+* Arthur Zamarin
+* NyuydineBill
+* freedisch
+* Michal Konecny
+
+1.9.0 (2024-01-30)
+==================
+
+Features
+--------
+
+* Support odd-numbered pre-release version filtering
+  (`PR#1708 <https://github.com/fedora-infra/anitya/pull/1708>`_)
+
+* Created Gitea backend.
+  (`#1566 <https://github.com/fedora-infra/anitya/issues/1566>`_)
+
+
+Bug Fixes
+---------
+
+* libraries.io consumer crashing
+  (`#1666 <https://github.com/fedora-infra/anitya/issues/1666>`_)
+
+
+Contributors
+------------
+Many thanks to the contributors of bug reports, pull requests, and pull request
+reviews for this release:
+
+* Erol Keskin
+* James Knight
+* Liora Milbaum
+* Michal Konecny
+
+
 1.8.1 (2023-05-26)
 ==================
 

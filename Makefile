@@ -10,7 +10,7 @@ define container-tool
 endef
 
 define download_dump
-	wget https://infrastructure.fedoraproject.org/infra/db-dumps/anitya.dump.xz -O ./.container/dump/anitya.dump.xz
+	wget -P ./.container/dump/ -nc https://infrastructure.fedoraproject.org/infra/db-dumps/anitya.dump.xz
 endef
 
 define remove_dump
@@ -19,27 +19,38 @@ endef
 
 up:
 	$(call compose-tool) up -d
-	sleep 3
+# Wait till the anitya-web container is ready
+	@until $(call container-tool) healthcheck run anitya-web >/dev/null 2>&1; do \
+		printf '.'; \
+		sleep 1; \
+	done
+	@echo ""
 	$(MAKE) init-db
 	@echo "Empty database initialized. Run dump-restore to fill it by production dump."
 restart:
 	$(MAKE) halt && $(MAKE) up
 halt:
-	$(call compose-tool) down -t1
+	$(call compose-tool) stop
 bash-web:
-	$(call container-tool) exec -it anitya-web bash -c "cat /app/.container/web/motd; bash;"
-bash-consumer:
-	$(call container-tool) exec -it anitya-librariesio-consumer bash -c "cat /app/.container/consumer/motd; bash;"
+	$(call container-tool) exec -it anitya-web bash -c "bash"
+bash-check:
+	$(call container-tool) exec -it anitya-check-service bash -c "bash"
 init-db:
-	$(call container-tool) exec -it anitya-web bash -c "python3 createdb.py"
+	$(call container-tool) exec -it anitya-web bash -c "poetry run python3 createdb.py"
 dump-restore: init-db
 	$(call download_dump)
+# Anitya containers need to be stopped before doing dump restore
+	$(call container-tool) stop anitya-check-service anitya-web
 	$(call container-tool) exec -it postgres bash -c 'createuser anitya && xzcat /dump/anitya.dump.xz | psql anitya'
-	$(call remove_dump)
+	$(MAKE) up
 logs:
-	$(call container-tool) logs -f anitya-web anitya-librariesio-consumer rabbitmq postgres
-clean: halt
-	$(call container-tool) rmi "localhost/anitya-base:latest" "docker.io/library/postgres:13.4" "docker.io/library/rabbitmq:3.8.16-management-alpine"
+	$(call container-tool) logs -f anitya-web anitya-check-service rabbitmq postgres
+clean:
+	$(call compose-tool) down
+	$(call remove_dump)
+	$(call container-tool) rmi "localhost/anitya-base:latest" "docker.io/library/postgres:16.13" "docker.io/library/rabbitmq:3.8.16-management-alpine"
+tests:
+	$(call container-tool) exec -it anitya-web bash -c "tox $(PARAM)"
 
-.PHONY: up restart halt bash-web bash-consumer \
-	init-db dump-restore logs clean
+.PHONY: up restart halt bash-web \
+	init-db dump-restore logs clean tests

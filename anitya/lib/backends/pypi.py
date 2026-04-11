@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2020 - Copyright Red Hat Inc
+(c) 2014-2020 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-   Ralph Bean <rbean@redhat.com>
-   Michal Konecny <mkonecny@redhat.com>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
+  Ralph Bean <rbean@redhat.com>
+  Michal Konecny <mkonecny@redhat.com>
 
 """
 
@@ -45,6 +45,10 @@ class PypiBackend(BaseBackend):
         except Exception as err:  # pragma: no cover
             raise AnityaPluginException(f"Could not contact {url}") from err
 
+        # Handle missing packages explicitly
+        if req.status_code == 404:
+            raise AnityaPluginException(f"Package not found on PyPI: {url}")
+
         # Not modified
         if req.status_code == 304:
             return None
@@ -68,7 +72,7 @@ class PypiBackend(BaseBackend):
         Returns:
             str: url used for version checking
         """
-        url = f"https://pypi.org/pypi/{project.name}/json"
+        url = f"https://pypi.org/pypi/{project.name}/json"  # noqa: E231
 
         return url
 
@@ -93,6 +97,10 @@ class PypiBackend(BaseBackend):
             req = cls.call_url(url, last_change=last_change)
         except Exception as err:  # pragma: no cover
             raise AnityaPluginException(f"Could not contact {url}") from err
+
+        # Handle missing packages explicitly
+        if req.status_code == 404:
+            raise AnityaPluginException(f"Package not found on PyPI: {url}")
 
         # Not modified
         if req.status_code == 304:
@@ -149,5 +157,5 @@ class PypiBackend(BaseBackend):
         for entry in items:
             title = entry["title"]["value"]
             name, version = title.rsplit(None, 1)
-            homepage = f"https://pypi.org/project/{name}/"
+            homepage = f"https://pypi.org/project/{name}/"  # noqa: E231
             yield name, homepage, cls.name, version

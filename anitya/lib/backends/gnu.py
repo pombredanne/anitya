@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014 - Copyright Red Hat Inc
+(c) 2014 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
 
 """
 
@@ -38,7 +38,7 @@ class GnuBackend(BaseBackend):
         Returns:
             str: url used for version checking
         """
-        url = f"https://ftp.gnu.org/gnu/{project.name}/"
+        url = f"https://ftp.gnu.org/gnu/{project.name}/"  # noqa: E231
 
         return url
 

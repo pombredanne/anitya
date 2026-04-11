@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2016 - Copyright Red Hat Inc
+(c) 2014-2016 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-   Ralph Bean <rbean@redhat.com>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
+  Ralph Bean <rbean@redhat.com>
 
 """
 
@@ -28,8 +28,8 @@ class CpanBackend(BaseBackend):
 
     name = "CPAN (perl)"
     examples = [
-        "https://metacpan.org/release/Net-Whois-Raw/",
-        "https://metacpan.org/release/SOAP/",
+        "https://metacpan.org/dist/Net-Whois-Raw/",
+        "https://metacpan.org/dist/SOAP/",
     ]
 
     @classmethod
@@ -44,7 +44,7 @@ class CpanBackend(BaseBackend):
         Returns:
             str: url used for version checking
         """
-        url = f"https://metacpan.org/release/{project.name}/"
+        url = f"https://metacpan.org/dist/{project.name}/"  # noqa: E231
 
         return url
 
@@ -93,6 +93,9 @@ class CpanBackend(BaseBackend):
             try:
                 name, version = title.text.rsplit("-", 1)
             except ValueError:
-                _log.info("Unable to parse CPAN package %s into a name and version")
-            homepage = f"https://metacpan.org/release/{name}/"
+                _log.info(
+                    "Unable to parse CPAN title %s into a package name and version",
+                    title,
+                )
+            homepage = f"https://metacpan.org/dist/{name}/"  # noqa: E231
             yield name, homepage, cls.name, version

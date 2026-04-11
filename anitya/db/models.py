@@ -270,7 +270,9 @@ class Project(Base):
     )
 
     updated_on = sa.Column(
-        sa.DateTime, server_default=sa.func.now(), onupdate=sa.func.current_timestamp()
+        sa.DateTime,
+        server_default=sa.sql.functions.now(),
+        onupdate=sa.sql.functions.current_timestamp(),
     )
     created_on = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
 
@@ -478,12 +480,12 @@ class Project(Base):
             version=self.latest_version,
             versions=self.versions,
             stable_versions=[str(v) for v in self.stable_versions],
-            created_on=time.mktime(self.created_on.timetuple())
-            if self.created_on
-            else None,
-            updated_on=time.mktime(self.updated_on.timetuple())
-            if self.updated_on
-            else None,
+            created_on=(
+                time.mktime(self.created_on.timetuple()) if self.created_on else None
+            ),
+            updated_on=(
+                time.mktime(self.updated_on.timetuple()) if self.updated_on else None
+            ),
             ecosystem=self.ecosystem_name,
         )
         if detailed:
@@ -531,7 +533,10 @@ class Project(Base):
         """By name and ecosystem"""
         try:
             query = session.query(cls)
-            query = query.filter(cls.name == name, cls.ecosystem_name == ecosystem)
+            query = query.filter(
+                sa.func.lower(cls.name) == name.lower(),
+                sa.func.lower(cls.ecosystem_name) == ecosystem.lower(),
+            )
             return query.one()
         except NoResultFound:
             return None
@@ -670,6 +675,24 @@ class Project(Base):
         else:
             return query.all()
 
+    @classmethod
+    def sort_projects(cls, projects, sort):
+        """
+        Sorts a list of projects objects based on a sort parameter.
+        """
+        sort_attr, _, sort_order = sort.partition("_")
+
+        attr_map = {"name": "name", "homepage": "homepage", "backend": "backend"}
+
+        sort_by = attr_map.get(sort_attr, "name")
+
+        projects.sort(
+            key=lambda project: getattr(project, sort_by, "").lower(),
+            reverse=sort_order == "desc",
+        )
+
+        return projects
+
 
 class ProjectVersion(Base):
     """
@@ -735,7 +758,9 @@ class ProjectFlag(Base):
     state = sa.Column(sa.String(50), default="open", nullable=False)
     created_on = sa.Column(sa.DateTime, default=datetime.datetime.utcnow)
     updated_on = sa.Column(
-        sa.DateTime, server_default=sa.func.now(), onupdate=sa.func.current_timestamp()
+        sa.DateTime,
+        server_default=sa.sql.functions.now(),
+        onupdate=sa.sql.functions.current_timestamp(),
     )
 
     project = sa.orm.relationship(
@@ -893,10 +918,10 @@ class GUID(TypeDecorator):
             return str(value)
         else:
             if not isinstance(value, uuid.UUID):
-                return f"{uuid.UUID(value).int:032x}"
+                return f"{uuid.UUID(value).int:032x}"  # noqa: E231
             else:
                 # hexstring
-                return f"{value.int:032x}"
+                return f"{value.int:032x}"  # noqa: E231
 
     def process_result_value(self, value, dialect):
         """
@@ -910,6 +935,8 @@ class GUID(TypeDecorator):
             uuid.UUID: The value as a Python :class:`uuid.UUID`.
         """
         if value is None:
+            return value
+        if isinstance(value, uuid.UUID):
             return value
         else:
             return uuid.UUID(value)
@@ -953,8 +980,6 @@ class User(Base):
             able to log in.
         admin (bool): Determine if this user is an administrator. If True the user is
             administrator.
-        social_auth (sqlalchemy.orm.dynamic.AppenderQuery): The list of
-            :class:`social_flask_sqlalchemy.models.UserSocialAuth` entries for this user.
     """
 
     __tablename__ = "users"
@@ -963,7 +988,7 @@ class User(Base):
     # SMTP says 256 is the maximum length of a path:
     # https://tools.ietf.org/html/rfc5321#section-4.5.3
     email = sa.Column(sa.String(256), nullable=False, index=True, unique=True)
-    username = sa.Column(sa.String(256), nullable=False, index=True, unique=True)
+    username = sa.Column(sa.String(256), nullable=False, index=True)
     active = sa.Column(sa.Boolean, default=True)
     admin = sa.Column(sa.Boolean, default=False)
 
@@ -978,6 +1003,8 @@ class User(Base):
         """
         if not self.admin:
             if six.text_type(self.id) in anitya_config.get("ANITYA_WEB_ADMINS", []):
+                self.admin = True
+            if six.text_type(self.email) in anitya_config.get("ANITYA_WEB_ADMINS", []):
                 self.admin = True
         return self.admin
 

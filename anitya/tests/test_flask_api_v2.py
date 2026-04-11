@@ -22,14 +22,15 @@
 """
 Tests for the Flask MethodView based v2 API
 """
+
 from __future__ import unicode_literals
 
 import json
+import datetime
 from unittest import mock
 
 import anitya_schema
 from fedora_messaging import testing as fml_testing
-from social_flask_sqlalchemy import models as social_models
 
 from anitya.db import Session, models
 from anitya.lib import exceptions
@@ -50,12 +51,8 @@ class PackagesResourceGetTests(DatabaseTestCase):
         self.app = self.flask_app.test_client()
         session = Session()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
 
         session.add(self.user)
-        session.add(user_social_auth)
         self.api_token = models.ApiToken(user=self.user)
         fedora = models.Distro("Fedora")
         debian = models.Distro("Debian")
@@ -463,12 +460,8 @@ class PackagesResourcePostTests(DatabaseTestCase):
         self.app = self.flask_app.test_client()
         session = Session()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
 
         session.add(self.user)
-        session.add(user_social_auth)
         self.api_token = models.ApiToken(user=self.user)
         self.project = models.Project(
             name="requests", homepage="https://pypi.io/project/requests", backend="PyPI"
@@ -713,12 +706,8 @@ class ProjectsResourceGetTests(DatabaseTestCase):
         self.app = self.flask_app.test_client()
         session = Session()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
 
         session.add(self.user)
-        session.add(user_social_auth)
         self.api_token = models.ApiToken(user=self.user)
         session.add(self.api_token)
         session.commit()
@@ -1128,12 +1117,8 @@ class ProjectsResourcePostTests(DatabaseTestCase):
         self.app = self.flask_app.test_client()
         session = Session()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
 
         session.add(self.user)
-        session.add(user_social_auth)
         self.api_token = models.ApiToken(user=self.user)
         session.add(self.api_token)
         session.commit()
@@ -1227,6 +1212,26 @@ class ProjectsResourcePostTests(DatabaseTestCase):
             "http://python-requests.org", data["requested_project"]["homepage"]
         )
         self.assertEqual("requests", data["requested_project"]["name"])
+
+    def test_required_version_url_for_backend(self):
+        """
+        Assert that backend with required version url will return 400
+        if version url is missing.
+        """
+        request_data = {
+            "backend": "custom",
+            "homepage": "http://python-requests.org",
+            "name": "requests",
+        }
+
+        output = self.app.post(
+            "/api/v2/projects/", headers=self.auth, data=request_data
+        )
+        self.assertEqual(output.status_code, 400)
+
+        # Error details should report conflicting fields.
+        data = _read_json(output)
+        self.assertIn("Chosen backend requires version_url", data)
 
     def test_valid_request(self):
         """Test valid request"""
@@ -1329,12 +1334,8 @@ class VersionsResourceGetTests(DatabaseTestCase):
         self.app = self.flask_app.test_client()
         session = Session()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
 
         session.add(self.user)
-        session.add(user_social_auth)
         self.api_token = models.ApiToken(user=self.user)
         session.add(self.api_token)
         session.commit()
@@ -1376,10 +1377,16 @@ class VersionsResourceGetTests(DatabaseTestCase):
         self.session.add(project)
         self.session.commit()
 
-        version = models.ProjectVersion(project=project, version="1.0.0")
+        created_on = datetime.datetime.now()
+
+        version = models.ProjectVersion(
+            project=project, version="1.0.0", created_on=created_on
+        )
         self.session.add(version)
 
-        version = models.ProjectVersion(project=project, version="0.9.9")
+        version = models.ProjectVersion(
+            project=project, version="0.9.9", created_on=created_on
+        )
         self.session.add(version)
         self.session.commit()
 
@@ -1389,6 +1396,7 @@ class VersionsResourceGetTests(DatabaseTestCase):
 
         exp = {
             "latest_version": "1.0.0",
+            "latest_version_created_on": created_on.isoformat(),
             "versions": ["1.0.0", "0.9.9"],
             "stable_versions": ["1.0.0", "0.9.9"],
         }
@@ -1410,10 +1418,16 @@ class VersionsResourceGetTests(DatabaseTestCase):
         self.session.add(project)
         self.session.commit()
 
-        version = models.ProjectVersion(project=project, version="test-1.0.0")
+        created_on = datetime.datetime.now()
+
+        version = models.ProjectVersion(
+            project=project, version="test-1.0.0", created_on=created_on
+        )
         self.session.add(version)
 
-        version = models.ProjectVersion(project=project, version="test-0.9.9")
+        version = models.ProjectVersion(
+            project=project, version="test-0.9.9", created_on=created_on
+        )
         self.session.add(version)
         self.session.commit()
 
@@ -1423,6 +1437,7 @@ class VersionsResourceGetTests(DatabaseTestCase):
 
         exp = {
             "latest_version": "1.0.0",
+            "latest_version_created_on": created_on.isoformat(),
             "versions": ["1.0.0", "0.9.9"],
             "stable_versions": ["1.0.0", "0.9.9"],
         }
@@ -1438,12 +1453,8 @@ class VersionsResourcePostTests(DatabaseTestCase):
         self.app = self.flask_app.test_client()
         session = Session()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
 
         session.add(self.user)
-        session.add(user_social_auth)
         self.api_token = models.ApiToken(user=self.user)
         session.add(self.api_token)
         session.commit()

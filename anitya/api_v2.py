@@ -18,7 +18,7 @@ from webargs.flaskparser import FlaskParser
 
 from anitya import authentication
 from anitya.db import Session, models
-from anitya.lib import utilities
+from anitya.lib import plugins, utilities
 from anitya.lib.exceptions import AnityaException, ProjectExists
 
 _log = logging.getLogger(__name__)
@@ -145,9 +145,9 @@ class PackagesResource(MethodView):
         :statuscode 400: If one or more of the query arguments is invalid.
         """
         user_args = {
-            "page": fields.Int(validate=_page_validator, missing=1),
+            "page": fields.Int(validate=_page_validator, load_default=1),
             "items_per_page": fields.Int(
-                validate=_items_per_page_validator, missing=25
+                validate=_items_per_page_validator, load_default=25
             ),
             "distribution": fields.Str(),
             "name": fields.Str(),
@@ -220,11 +220,13 @@ class PackagesResource(MethodView):
 
         :reqheader Authorization: API token to use for authentication
         :reqjson string distribution: The name of the distribution that contains this
-            package.
-        :reqjson string package_name: The name of the package in the distribution repository.
-        :reqjson string project_name: The project name in Anitya.
+            package. (mandatory argument)
+        :reqjson string package_name: The name of the package in the distribution
+            repository. (mandatory argument)
+        :reqjson string project_name: The project name in Anitya. (mandatory argument)
         :reqjson string project_ecosystem: The ecosystem the project is a part of.
-            If it's not part of an ecosystem, use the homepage used in the Anitya project.
+            If it's not part of an ecosystem, use the homepage used in the Anitya
+            project. (mandatory argument)
 
         :statuscode 201: When the package was successfully created.
         :statuscode 400: When required arguments are missing or malformed.
@@ -241,13 +243,12 @@ class PackagesResource(MethodView):
             args = parser.parse(user_args, request, location="form")
         else:
             args = parser.parse(user_args, request, location="json")
-        try:
-            project = models.Project.query.filter(
-                func.lower(models.Project.name) == func.lower(args["project_name"]),
-                func.lower(models.Project.ecosystem_name)
-                == func.lower(args["project_ecosystem"]),
-            ).one()
-        except NoResultFound:
+        project = models.Project.query.filter(
+            func.lower(models.Project.name) == func.lower(args["project_name"]),
+            func.lower(models.Project.ecosystem_name)
+            == func.lower(args["project_ecosystem"]),
+        ).first()
+        if not project:
             return (
                 {
                     "error": f'Project "{args["project_name"]}" in ecosystem '
@@ -374,9 +375,9 @@ class ProjectsResource(MethodView):
         :statuscode 400: If one or more of the query arguments is invalid.
         """
         user_args = {
-            "page": fields.Int(validate=_page_validator, missing=1),
+            "page": fields.Int(validate=_page_validator, load_default=1),
             "items_per_page": fields.Int(
-                validate=_items_per_page_validator, missing=25
+                validate=_items_per_page_validator, load_default=25
             ),
             "ecosystem": fields.Str(),
             "name": fields.Str(),
@@ -448,9 +449,9 @@ class ProjectsResource(MethodView):
             }
 
         :query string access_token: Your API access token.
-        :reqjson string name: The project name
-        :reqjson string homepage: The project homepage URL
-        :reqjson string backend: The project backend (github, folder, etc.).
+        :reqjson string name: The project name (mandatory argument)
+        :reqjson string homepage: The project homepage URL (mandatory argument)
+        :reqjson string backend: The project backend (github, folder, etc.). (mandatory argument)
         :reqjson string version_url: The URL to fetch when determining the
                                      project version (defaults to null).
         :reqjson string version_scheme: The project version scheme. If missing, it's set to "RPM".
@@ -478,20 +479,29 @@ class ProjectsResource(MethodView):
             "name": fields.Str(required=True),
             "homepage": fields.Str(required=True),
             "backend": fields.Str(required=True),
-            "version_url": fields.Str(missing=None),
-            "version_scheme": fields.Str(missing="RPM"),
-            "version_pattern": fields.Str(missing=None),
-            "version_prefix": fields.Str(missing=None),
-            "pre_release_filter": fields.Str(missing=None),
-            "version_filter": fields.Str(missing=None),
-            "regex": fields.Str(missing=None),
-            "insecure": fields.Bool(missing=False),
-            "check_release": fields.Bool(missing=False),
+            "version_url": fields.Str(load_default=None),
+            "version_scheme": fields.Str(load_default="RPM"),
+            "version_pattern": fields.Str(load_default=None),
+            "version_prefix": fields.Str(load_default=None),
+            "pre_release_filter": fields.Str(load_default=None),
+            "version_filter": fields.Str(load_default=None),
+            "regex": fields.Str(load_default=None),
+            "insecure": fields.Bool(load_default=False),
+            "check_release": fields.Bool(load_default=False),
         }
         if not request.is_json:
             args = parser.parse(user_args, request, location="form")
         else:
             args = parser.parse(user_args, request, location="json")
+
+        if not args["version_url"]:
+            backend = plugins.get_plugin(args["backend"])
+            if backend.required_version_url:
+                response = (
+                    jsonify("Chosen backend requires version_url"),
+                    400,
+                )
+                return response
 
         try:
             project = utilities.create_project(
@@ -554,6 +564,7 @@ class VersionsResource(MethodView):
 
             {
                 "latest_version": "2.12",
+                "latest_version_created_on": "2026-03-31T14:30:00Z",
                 "versions": [
                     "2.12",
                     "2.11",
@@ -593,6 +604,15 @@ class VersionsResource(MethodView):
             "versions": project.versions,
             "stable_versions": [str(v) for v in project.stable_versions],
         }
+
+        latest_version_object = project.latest_version_object
+        if latest_version_object:
+            response.update(
+                {
+                    "latest_version_created_on": latest_version_object.created_on.isoformat()
+                }
+            )
+
         return response
 
     @authentication.require_token
@@ -692,10 +712,10 @@ class VersionsResource(MethodView):
             "version_prefix": fields.Str(),
             "pre_release_filter": fields.Str(),
             "version_filter": fields.Str(),
-            "regex": fields.Str(missing=None),
-            "insecure": fields.Bool(missing=False),
-            "releases_only": fields.Bool(missing=False),
-            "dry_run": fields.Bool(missing=True),
+            "regex": fields.Str(load_default=None),
+            "insecure": fields.Bool(load_default=False),
+            "releases_only": fields.Bool(load_default=False),
+            "dry_run": fields.Bool(load_default=True),
         }
         if not request.is_json:
             args = parser.parse(user_args, request, location="form")

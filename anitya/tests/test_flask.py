@@ -27,7 +27,6 @@ import anitya_schema
 import mock
 from fedora_messaging import testing as fml_testing
 from six.moves.urllib import parse
-from social_flask_sqlalchemy import models as social_models
 from sqlalchemy.exc import SQLAlchemyError
 
 from anitya import ui
@@ -63,12 +62,7 @@ class SettingsTests(DatabaseTestCase):
         super().setUp()
         self.app = self.flask_app.test_client()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
-
         self.session.add(self.user)
-        self.session.add(user_social_auth)
         self.session.commit()
 
     def test_login_required(self):
@@ -187,12 +181,7 @@ class NewProjectTests(DatabaseTestCase):
         create_distro(self.session)
         self.app = self.flask_app.test_client()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
-
         self.session.add(self.user)
-        self.session.add(user_social_auth)
         self.session.commit()
 
     def test_protected_view(self):
@@ -449,12 +438,7 @@ class FlaskTest(DatabaseTestCase):
         self.flask_app.config["TESTING"] = True
         self.app = self.flask_app.test_client()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
-
         self.session.add(self.user)
-        self.session.add(user_social_auth)
         self.session.commit()
 
     def test_index(self):
@@ -553,6 +537,7 @@ class FlaskTest(DatabaseTestCase):
         self.assertEqual(output.data.count(b'<a href="/project/'), 3)
 
         output = self.app.get("/projects/?page=ab")
+        output = self.app.get("/projects/?sort=name_asc")
         self.assertEqual(output.status_code, 200)
         self.assertEqual(output.data.count(b'<a href="/project/'), 3)
 
@@ -679,6 +664,10 @@ class FlaskTest(DatabaseTestCase):
         create_project(self.session)
 
         output = self.app.get("/projects/search/g")
+        self.assertEqual(output.status_code, 200)
+        self.assertEqual(output.data.count(b'<a href="/project/1'), 1)
+
+        output = self.app.get("/projects/search/geany ")
         self.assertEqual(output.status_code, 200)
         self.assertEqual(output.data.count(b'<a href="/project/1'), 1)
 
@@ -841,12 +830,7 @@ class EditProjectTests(DatabaseTestCase):
         self.app = self.flask_app.test_client()
         # Make a user to login with
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
-
         self.session.add(self.user)
-        self.session.add(user_social_auth)
         self.session.commit()
         create_distro(self.session)
         create_project(self.session)
@@ -1022,12 +1006,7 @@ class MapProjectTests(DatabaseTestCase):
         create_project(self.session)
         self.client = self.flask_app.test_client()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
-
         self.session.add(self.user)
-        self.session.add(user_social_auth)
         self.session.commit()
 
     def test_protected_view(self):
@@ -1130,12 +1109,7 @@ class EditProjectMappingTests(DatabaseTestCase):
         # Set up a mapping to edit
         session = Session()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
-
         self.session.add(self.user)
-        self.session.add(user_social_auth)
         self.distro1 = models.Distro(name="CentOS")
         self.distro2 = models.Distro(name="Fedora")
         self.project = models.Project(
@@ -1293,18 +1267,10 @@ class AddDistroTests(DatabaseTestCase):
         # Add a regular user and an admin user
         session = Session()
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
-
         session.add(self.user)
-        session.add(user_social_auth)
-        self.admin = models.User(email="admin@example.com", username="admin")
-        admin_social_auth = social_models.UserSocialAuth(
-            user_id=self.admin.id, user=self.admin
-        )
 
-        session.add_all([admin_social_auth, self.admin])
+        self.admin = models.User(email="admin@example.com", username="admin")
+        session.add_all([self.admin])
         session.commit()
 
         self.client = self.flask_app.test_client()
@@ -1374,12 +1340,7 @@ class FlagProjecTests(DatabaseTestCase):
 
         create_project(self.session)
         self.user = models.User(email="user@fedoraproject.org", username="user")
-        user_social_auth = social_models.UserSocialAuth(
-            user_id=self.user.id, user=self.user
-        )
-
         self.session.add(self.user)
-        self.session.add(user_social_auth)
         self.session.commit()
         self.client = self.flask_app.test_client()
 

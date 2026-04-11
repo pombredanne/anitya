@@ -15,7 +15,7 @@ will review your code. Please make sure you follow the guidelines below:
 Python Support
 --------------
 
-Anitya supports Python 3.8 or greater so please ensure the code
+Anitya supports Python 3.10 or greater so please ensure the code
 you submit works with these versions. The test suite will run against all supported
 Python versions to make this easier.
 
@@ -47,12 +47,18 @@ will be created when ``poetry run tox`` will be run.
 Unit Tests
 ----------
 
-The test suites can be run using `tox <http://tox.readthedocs.io/>`_ by simply running
-``poetry run tox`` from the repository root. These tests include unit tests, a linter to ensure
-Python code style is correct, checks for possible security issues, and checks the
-documentation for Sphinx warnings or errors.
+The test suites can be run using `tox <http://tox.readthedocs.io/>`_::
 
-All tests must pass. All new code should have 100% test coverage.
+    poetry run tox
+
+These tests include unit tests, checks for possible security issues, a linter for
+Python code style and documentation checks for Sphinx warnings or errors.
+
+All tests must pass. All new code should have 100% test coverage. The coverage is
+stored in `htmlcov/` directory after running tests. To open it with a browser::
+
+    xdg-open htmlcov/index.html
+
 Any bugfix should be accompanied by one or more unit tests to demonstrate the fix.
 If you are unsure how to write unit tests for your code, we will be happy to help
 you during the code review process.
@@ -62,8 +68,8 @@ CI (Continuous Integration)
 ---------------------------
 
 Anitya has a CI set up to run on each PR. As a CI of choice Anitya is using
-`Fedora zuul <https://fedoraproject.org/wiki/Zuul-based-ci>`_ and the configuration
-could be found in `.zuul.yaml` in Anitya root directory.
+GitHub Actions and the configuration
+could be found in `.github/workflows/main.yaml` in Anitya root directory.
 
 The CI runs unit tests for all supported python versions, code style test, coverage test,
 flake8 test (linter), documentation test build and bandit (to check for any security issue).
@@ -123,97 +129,21 @@ A preview of the release notes can be generated with ``poetry towncrier --draft`
 Development Environment
 =======================
 
-There are two options for setting up a development environment. If you're not
-sure which one to choose, pick the Vagrant method.
-
-Vagrant
--------
-
-The `Vagrant`_ development environment is set up using `Ansible`_.
-
-To get started, install Vagrant and Ansible. On Fedora::
-
-    $ sudo dnf install @virtualization vagrant vagrant-libvirt vagrant-sshfs ansible
-
-Make sure that the following services are enabled & started on the host::
-
-    $ sudo systemctl enable --now virtnetworkd
-    $ sudo systemctl enable --now libvirtd
-
-Next, clone the repository and start the Vagrant machine::
-
-    $ git clone https://github.com/fedora-infra/anitya.git
-    $ cd anitya
-    $ vagrant up
-    $ vagrant ssh
-
-When you log in you'll be presented with a message of the day with more details
-about the environment.
-
-To start the Anitya instance in vagrant you can run::
-
-    $ systemctl --user enable --now anitya.service
-
-You may then access Anitya on your host at::
-
-    http://127.0.0.1:5000
-
-or::
-
-    http://localhost:5000
-
-By default, Anitya imports the production database so you've got something
-to start with. If instead you prefer an empty database, add the following
-to the Ansible provisioner inside your `Vagrantfile`::
-
-    ansible.extra_vars = { import_production_database: false }
-
-The application's configuration file is ``/home/vagrant/anitya.toml``.
-You can also look at the `sample configuration <https://github.com/fedora-infra/anitya/blob/master/files/anitya.toml.sample>`_
-
-.. note::
-   Please don't commit any local changes to Vagrantfile. We are managing it
-   upstream.
-
-Vagrant is using `PostgreSQL database <https://www.postgresql.org/>`_.
-To work with it use ``psql`` command::
-
-    $ sudo -u postgres psql
-    postgres=#\connect anitya
-
-After this you can use standard `SQL queries
-<https://www.postgresql.org/docs/10/static/tutorial-sql.html>`_ or
-another ``psql`` commands::
-
-    # Show description of tables
-    \dt
-    # Show table description
-    \d users
-
-For additional ``psql`` commands see ``man psql``.
-
-To run libraries.io service in the guest vm simply run::
-
-   $ systemctl --user enable --now librariesio-consumer.service
-
-To run check service in the guest vm simply run::
-
-   $ systemctl --user enable --now check-service.service
-
 Docker / Podman
 ---------------
 
-This way, you will be able to control each service (anitya-web, anitya-librariesio-consumer. RabbitMQ, etc) separately. You can turn off RabbitMQ or PostgreSQL or both, then connect to external services or use them with the application.
+This way, you will be able to control each service (anitya-web, RabbitMQ, etc) separately. You can turn off RabbitMQ or PostgreSQL or both, then connect to external services or use them with the application.
 
 Requirements:
 
 * Docker / Podman
 * Docker Compose / Podman Compose
 
-Next, clone the repository and start containers::
+Next, clone the repository, prepare config and start containers::
 
     $ git clone https://github.com/fedora-infra/anitya
     $ cd anitya
+    $ cp anitya.toml.example anitya.toml
     $ make up
 
 .. list-table:: Container Service Informations:
@@ -239,25 +169,29 @@ Makefile scripts that provide easier container management:
 * ``make restart`` Restarts all the container services that are either stopped or running
 * ``make halt`` Stops and removes the containers
 * ``make bash-web`` Connects to anitya-web container
-* ``make bash-consumer`` Connects to anitya-librariesio-consumer container
+* ``make bash-check-service`` Connects to anitya-check-service container
 * ``make init-db`` Creates database
 * ``make dump-restore`` Import production database
 * ``make logs`` Shows all logs of all containers
 * ``make clean`` Removes all images used by Anitya compose
+* ``make tests`` Run tests in Anitya container. You can provide parameters for
+  tox in ``PARAM`` variable. Few examples:
+
+  * ``PARAM="-e format" make tests`` - run only format test environment
+  * ``PARAM="-- anitya/tests/test_app.py" make tests`` - run tests only for ``test_app.py`` file
+  * ``PARAM="-e format -- anitya/tests/test_app.py" make tests`` - combine the two above
 
 Project files are bound to each other with host and container. Whenever you change any project file from the host or the container, the same change will happen on the opposite side as well.
 
 Anitya is accessible on http://localhost:5000
 
-Start the check service with::
+Check service for Anitya is running in separate container.
 
-    $ make bash-consumer or make-bash-web
-    $ check_service.py
+For testing purposes there are two predefined users.
+You can see them on login page.
 
-To apply changes run::
+To apply configuration changes::
     $ make restart
-
-This will restart the container, deploy the changes in code and start the development instance again.
 
 Python virtualenv
 -----------------
@@ -356,7 +290,7 @@ If you are a maintainer and wish to make a release, follow these steps:
 
 6. Remove every remaining news fragment from ``news`` folder.
 
-7. Generate new DB schema image by running ``./generate_db_schema`` in ``docs`` folder.
+7. Generate new DB schema image by running ``poetry run ./generate_db_schema`` in ``docs`` folder.
 
 8. Commit your changes with message *Anitya <version>*.
 
@@ -385,4 +319,3 @@ If you are a maintainer and wish to make a release, follow these steps:
      $ git push origin production
 
 .. _Ansible: https://www.ansible.com/
-.. _Vagrant: https://vagrantup.com/

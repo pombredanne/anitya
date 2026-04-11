@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014 - Copyright Red Hat Inc
+(c) 2014 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
 
 """
-
 
 from anitya.lib.backends import REGEX, BaseBackend, get_versions_by_regex
 
@@ -34,7 +33,7 @@ class LaunchpadBackend(BaseBackend):
         Returns:
             str: url used for version checking
         """
-        url = f"https://launchpad.net/{project.name}/+download"
+        url = f"https://launchpad.net/{project.name}/+download"  # noqa: E231
 
         return url
 

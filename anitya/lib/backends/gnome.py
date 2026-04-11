@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2020 - Copyright Red Hat Inc
+(c) 2014-2020 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-   Michal Konecny <mkonecny@redhat.com>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
+  Michal Konecny <mkonecny@redhat.com>
 
 """
 
@@ -73,7 +73,7 @@ class GnomeBackend(BaseBackend):
         Returns:
             str: url used for version checking
         """
-        url = f"https://download.gnome.org/sources/{project.name}/"
+        url = f"https://download.gnome.org/sources/{project.name}/"  # noqa: E231
 
         return url
 

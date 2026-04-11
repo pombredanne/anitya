@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2016 - Copyright Red Hat Inc
+(c) 2014-2016 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
 
 """
 
@@ -50,7 +50,7 @@ class Drupal7Backend(BaseBackend):
         if "-" in project.name:
             name = project.name.replace("-", "_")
 
-        return f"https://updates.drupal.org/release-history/{name}/7.x"
+        return f"https://updates.drupal.org/release-history/{name}/7.x"  # noqa: E231
 
     @classmethod
     def get_versions(cls, project):

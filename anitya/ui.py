@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """UI"""
+
 from math import ceil
+import os
 
 import flask
 from flask_login import current_user, login_required, logout_user
@@ -23,6 +25,7 @@ def get_extended_pattern(pattern):
     adjusting it accordingly.
     """
 
+    pattern = pattern.strip()
     if not pattern.startswith("*"):
         pattern = "*" + pattern
     if not pattern.endswith("*"):
@@ -57,6 +60,8 @@ def login():
         next_url = "/"
 
     flask.session["next_url"] = next_url
+    if os.environ.get("FLASK_DEBUG"):  # pragma: no cover
+        return flask.render_template("login_debug.html")
     return flask.render_template("login.html")
 
 
@@ -160,7 +165,7 @@ def project_name(project_name):
 def projects():
     """Projects"""
     page = flask.request.args.get("page", 1)
-
+    sort = flask.request.args.get("sort", None)
     try:
         page = int(page)
     except ValueError:
@@ -168,6 +173,9 @@ def projects():
 
     projects = models.Project.all(Session, page=page)
     projects_count = models.Project.all(Session, count=True)
+
+    if sort:
+        projects = models.Project.sort_projects(projects, sort)
 
     total_page = int(ceil(projects_count / float(50)))
 
@@ -200,7 +208,7 @@ def projects_updated(status="updated"):
     if status not in statuses:
         flask.flash(
             f"{status} is invalid, you should use one of: "
-            f"{', '.join(statuses)}; using default: `updated`",
+            f"{', '.join(statuses)}; using default: `updated`",  # noqa: E702
             "errors",
         )
         flask.flash(
@@ -355,6 +363,7 @@ def projects_search(pattern=None):
     """Search projects"""
     pattern = flask.request.args.get("pattern", pattern) or "*"
     page = flask.request.args.get("page", 1)
+    sort = flask.request.args.get("sort", "name_asc")
     exact = flask.request.args.get("exact", 0)
 
     try:
@@ -383,6 +392,8 @@ def projects_search(pattern=None):
             flask.url_for("anitya_ui.project", project_id=projects[0].id)
         )
 
+    projects = models.Project.sort_projects(projects, sort)
+
     total_page = int(ceil(projects_count / float(50)))
 
     return flask.render_template(
@@ -393,6 +404,7 @@ def projects_search(pattern=None):
         total_page=total_page,
         projects_count=projects_count,
         page=page,
+        sort=sort,
     )
 
 
@@ -499,18 +511,24 @@ def new_project():
                 homepage=form.homepage.data.strip(),
                 backend=form.backend.data.strip(),
                 version_scheme=form.version_scheme.data.strip(),
-                version_url=form.version_url.data.strip()
-                if form.version_url.data
-                else None,
-                version_prefix=form.version_prefix.data.strip()
-                if form.version_prefix.data
-                else None,
-                pre_release_filter=form.pre_release_filter.data.strip()
-                if form.pre_release_filter.data
-                else None,
-                version_filter=form.version_filter.data.strip()
-                if form.version_filter.data
-                else None,
+                version_url=(
+                    form.version_url.data.strip() if form.version_url.data else None
+                ),
+                version_prefix=(
+                    form.version_prefix.data.strip()
+                    if form.version_prefix.data
+                    else None
+                ),
+                pre_release_filter=(
+                    form.pre_release_filter.data.strip()
+                    if form.pre_release_filter.data
+                    else None
+                ),
+                version_filter=(
+                    form.version_filter.data.strip()
+                    if form.version_filter.data
+                    else None
+                ),
                 regex=form.regex.data.strip() if form.regex.data else None,
                 user_id=flask.g.user.username,
                 releases_only=form.releases_only.data,
@@ -591,24 +609,34 @@ def edit_project(project_id):
                 name=form.name.data.strip(),
                 homepage=form.homepage.data.strip(),
                 backend=form.backend.data.strip(),
-                version_scheme=form.version_scheme.data.strip()
-                if form.version_scheme.data
-                else None,
-                version_pattern=form.version_pattern.data.strip()
-                if form.version_pattern.data
-                else None,
-                version_url=form.version_url.data.strip()
-                if form.version_url.data
-                else None,
-                version_prefix=form.version_prefix.data.strip()
-                if form.version_prefix.data
-                else None,
-                pre_release_filter=form.pre_release_filter.data.strip()
-                if form.pre_release_filter.data
-                else None,
-                version_filter=form.version_filter.data.strip()
-                if form.version_filter.data
-                else None,
+                version_scheme=(
+                    form.version_scheme.data.strip()
+                    if form.version_scheme.data
+                    else None
+                ),
+                version_pattern=(
+                    form.version_pattern.data.strip()
+                    if form.version_pattern.data
+                    else None
+                ),
+                version_url=(
+                    form.version_url.data.strip() if form.version_url.data else None
+                ),
+                version_prefix=(
+                    form.version_prefix.data.strip()
+                    if form.version_prefix.data
+                    else None
+                ),
+                pre_release_filter=(
+                    form.pre_release_filter.data.strip()
+                    if form.pre_release_filter.data
+                    else None
+                ),
+                version_filter=(
+                    form.version_filter.data.strip()
+                    if form.version_filter.data
+                    else None
+                ),
                 regex=form.regex.data.strip() if form.regex.data else None,
                 insecure=form.insecure.data,
                 user_id=flask.g.user.username,

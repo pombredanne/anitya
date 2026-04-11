@@ -4,20 +4,11 @@
 
 {% block body %}
 <div class="d-flex align-itmes-start gap-3">
-    {% for name, backend in available_backends.items() %}
-        {% if name == 'openid'%}
-            <form role="form" action="{{url_for('social.auth', backend=name)}}" method="post" class="d-flex">
-                <input name="openid_identifier" placeholder="https://id.openid.server" class="form-control me-2">
-                <button type="submit" class="btn btn-success">
-                    Login</button>
-            </form>
-        {% elif name == 'google-oauth2' %}
-            <a title="{{ Google }}" class="btn btn-primary" role="button"
-                href="{{url_for('social.auth', backend=name)}}">Google</a>
-        {% else %}
-            <a title="{{ name.capitalize() }}" class="btn btn-primary" role="button"
-                href="{{url_for('social.auth', backend=name)}}">{{ name.capitalize() }}</a>
-        {% endif %}
+    {% for backend in available_backends %}
+    <a title="{{ backend }}" class="btn btn-outline-primary" role="button" href="{{ url_for('anitya_auth.login', name=backend.lower()) }}">
+      <img src="{{url_for('anitya_ui.static', filename=backend.lower() + '_logo.png')}}">
+      <span>{{ backend }}</span>
+    </a>
     {% endfor %}
 </div>
 {% endblock %}

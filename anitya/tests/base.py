@@ -20,6 +20,7 @@
 """
 Base class for Anitya tests.
 """
+
 from __future__ import print_function
 
 import os
@@ -29,7 +30,6 @@ from contextlib import contextmanager
 import flask_login
 import vcr
 from flask import request_started
-from social_flask_sqlalchemy.models import PSABase
 from sqlalchemy import create_engine, event
 
 from anitya import app, config
@@ -88,7 +88,7 @@ def _configure_db(db_uri="sqlite://"):
         @event.listens_for(engine, "begin")
         def begin_event(conn):
             """Emit our own 'BEGIN' instead of letting pysqlite do it."""
-            conn.execute("BEGIN")
+            conn.exec_driver_sql("BEGIN")
 
     @event.listens_for(Session, "after_transaction_end")
     def restart_savepoint(session, transaction):
@@ -146,8 +146,7 @@ class DatabaseTestCase(AnityaTestCase):
 
         self.connection = engine.connect()
         Base.metadata.create_all(bind=self.connection)
-        PSABase.metadata.create_all(bind=self.connection)
-        self.transaction = self.connection.begin()
+        self.transaction = self.connection.begin_nested()
 
         Session.remove()
         Session.configure(bind=self.connection, autoflush=False)
@@ -208,37 +207,31 @@ def create_project(session):
 
 
 def create_ecosystem_projects(session):
-    """Create some fake projects from particular upstream ecosystems
+    """Create some fake projects from particular upstream ecosystems."""
 
-    Each project name is used in two different ecosystems
-    """
-    project = models.Project(
-        name="pypi_and_npm",
-        homepage="https://example.com/not-a-real-pypi-project",
-        backend="PyPI",
-    )
-    session.add(project)
+    projects = [
+        # Project names that are used in two different ecosystems
+        ("pypi_and_npm", "PyPI", "https://example.com/not-a-real-pypi-project"),
+        ("pypi_and_npm", "npmjs", "https://example.com/not-a-real-npmjs-project"),
+        (
+            "rubygems_and_maven",
+            "Rubygems",
+            "https://example.com/not-a-real-rubygems-project",
+        ),
+        (
+            "rubygems_and_maven",
+            "Maven Central",
+            "https://example.com/not-a-real-maven-project",
+        ),
+        # Uppercase project name to test API case-insensitivity for PyPI
+        ("UpperCase_Name", "PyPI", "https://example.com/not-a-real-pypi-project"),
+    ]
 
-    project = models.Project(
-        name="pypi_and_npm",
-        homepage="https://example.com/not-a-real-npmjs-project",
-        backend="npmjs",
-    )
-    session.add(project)
+    for name, backend, homepage in projects:
+        project = models.Project(name=name, backend=backend, homepage=homepage)
+        # project.ecosystem_name is set in anitya/db/events.py
+        session.add(project)
 
-    project = models.Project(
-        name="rubygems_and_maven",
-        homepage="https://example.com/not-a-real-rubygems-project",
-        backend="Rubygems",
-    )
-    session.add(project)
-
-    project = models.Project(
-        name="rubygems_and_maven",
-        homepage="https://example.com/not-a-real-maven-project",
-        backend="Maven Central",
-    )
-    session.add(project)
     session.commit()
 
 

@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2020 - Copyright Red Hat Inc
+(c) 2014-2025 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-   Michal Konecny <mkonecny@redhat.com>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
+  Michal Konecny <mkonecny@redhat.com>
 
 """
 
 import logging
+
+import arrow
 
 from anitya.config import config
 from anitya.lib import utilities
@@ -18,20 +20,7 @@ from anitya.lib.exceptions import AnityaPluginException, RateLimitException
 
 API_URL = "https://api.github.com/graphql"
 
-"""
-Rate limit threshold (percent)
-10 percent of limit is left for users
-"""
-RATE_LIMIT_THRESHOLD = 0.1
-
 _log = logging.getLogger(__name__)
-
-"""
-Reset time that is currently set for GitHub backend.
-Used when GitHub starts returning HTTP status code 403,
-which doesn't contains this information anymore.
-"""
-reset_time = "1970-01-01T00:00:00Z"
 
 
 class GithubBackend(BaseBackend):
@@ -101,10 +90,17 @@ class GithubBackend(BaseBackend):
             ) from err
 
         if resp.ok:
+            if int(resp.headers["X-RateLimit-Remaining"]) == 0:
+                _log.info("Github API ratelimit reached.")
+                reset_time = arrow.Arrow.utcfromtimestamp(
+                    resp.headers["X-RateLimit-Reset"]
+                )
+                raise RateLimitException(reset_time.isoformat())
             json = resp.json()
         elif resp.status_code == 403:
             _log.info("Github API ratelimit reached.")
-            raise RateLimitException(reset_time)
+            reset_time = arrow.Arrow.utcfromtimestamp(resp.headers["X-RateLimit-Reset"])
+            raise RateLimitException(reset_time.isoformat())
         else:
             raise AnityaPluginException(
                 f"{project.name}: Server responded with status "
@@ -147,7 +143,7 @@ class GithubBackend(BaseBackend):
             )
 
         try:
-            (owner, repo) = url.split("/")
+            owner, repo = url.split("/")
         except ValueError as err:
             raise AnityaPluginException(
                 f"""Project {project.name} was incorrectly set up.
@@ -206,24 +202,6 @@ def parse_json(json, project):
             when rate limit threshold is reached.
 
     """
-    global reset_time  # pylint: disable=W0603
-    # We need to check limit first,
-    # because exceeding the limit will also return error
-    try:
-        limit = json["data"]["rateLimit"]["limit"]
-        remaining = json["data"]["rateLimit"]["remaining"]
-        reset_time = json["data"]["rateLimit"]["resetAt"]
-        _log.debug(
-            "Github API ratelimit remains %s, will reset at %s UTC",
-            remaining,
-            reset_time,
-        )
-
-        if (remaining / limit) <= RATE_LIMIT_THRESHOLD:
-            raise RateLimitException(reset_time)
-    except KeyError:
-        _log.info("Github API ratelimit key is missing. Checking for errors.")
-
     if "errors" in json:
         error_str = ""
         for error in json["errors"]:
@@ -285,7 +263,7 @@ def prepare_query(owner, repo, releases_only):
     if releases_only:
         fetch_obj = "releases"
         # get release name and follow release -> tag
-        rel_tag_fragment = f"name tag {{ {tag_fragment} }}"
+        rel_tag_fragment = f"name tag {{ {tag_fragment} }}"  # noqa: E202,E201
         order_by_field = "CREATED_AT"
     else:
         fetch_obj = "refs"
@@ -317,6 +295,6 @@ def prepare_query(owner, repo, releases_only):
         remaining
         resetAt
     }}
-}}"""
+}}"""  # noqa: E202
 
     return query

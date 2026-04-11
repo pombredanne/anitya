@@ -22,11 +22,11 @@ Revision ID: feeaa70ead67
 Revises: a52d2fe99d4f
 Create Date: 2017-07-07 14:23:30.605238
 """
+
 import uuid
 
 import sqlalchemy as sa
 from alembic import op
-from social_sqlalchemy import storage
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.types import CHAR, TypeDecorator
 
@@ -80,10 +80,10 @@ class GUID(TypeDecorator):  # pylint: disable=W0223
             return str(value)
         else:
             if not isinstance(value, uuid.UUID):
-                return f"{uuid.UUID(value).int:032x}"
+                return f"{uuid.UUID(value).int: 032x}"
             else:
                 # hexstring
-                return f"{value.int:032x}"
+                return f"{value.int: 032x}"
 
     def process_result_value(self, value, dialect):
         """
@@ -140,7 +140,7 @@ def upgrade():
         "social_auth_partial",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("token", sa.String(length=32), nullable=True),
-        sa.Column("data", storage.JSONType(), nullable=True),
+        sa.Column("data", sa.JSON, nullable=True),
         sa.Column("next_step", sa.Integer(), nullable=True),
         sa.Column("backend", sa.String(length=32), nullable=True),
         sa.PrimaryKeyConstraint("id"),
@@ -155,7 +155,7 @@ def upgrade():
         "social_auth_usersocialauth",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("provider", sa.String(length=32), nullable=True),
-        sa.Column("extra_data", storage.JSONType(), nullable=True),
+        sa.Column("extra_data", sa.JSON, nullable=True),
         sa.Column("uid", sa.String(length=255), nullable=True),
         sa.Column("user_id", GUID(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),

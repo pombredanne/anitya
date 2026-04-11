@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2015-2020 - Copyright Red Hat Inc
+(c) 2015-2020 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-   Michal Konecny <mkonecny@redhat.com>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
+  Michal Konecny <mkonecny@redhat.com>
 
 """
-
 
 from __future__ import print_function
 
@@ -52,7 +51,7 @@ class PagureBackend(BaseBackend):
         Returns:
             str: url used for version checking
         """
-        url = f"https://pagure.io/api/0/{project.name}/git/tags"
+        url = f"https://pagure.io/api/0/{project.name}/git/tags"  # noqa: E231
 
         return url
 

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
 """
- (c) 2014-2020 - Copyright Red Hat Inc
+(c) 2014-2020 - Copyright Red Hat Inc
 
- Authors:
-   Pierre-Yves Chibon <pingou@pingoured.fr>
-   Ralph Bean <rbean@redhat.com>
-   Michal Konecny <mkonecny@redhat.com>
+Authors:
+  Pierre-Yves Chibon <pingou@pingoured.fr>
+  Ralph Bean <rbean@redhat.com>
+  Michal Konecny <mkonecny@redhat.com>
 
 """
 
@@ -133,5 +133,5 @@ class PearBackend(BaseBackend):
         for entry in items:
             title = entry["title"]["value"]
             name, version = title.rsplit(None, 1)
-            homepage = f"https://pear.php.net/package/{name}"
+            homepage = f"https://pear.php.net/package/{name}"  # noqa: E231
             yield name, homepage, cls.name, version

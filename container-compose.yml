@@ -7,40 +7,41 @@ services:
       context: .
       dockerfile: Containerfile.dev
       args:
-        FEDORA_VERSION: 38
+        FEDORA_VERSION: 42
     container_name: "anitya-web"
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
-      - ./anitya/:/app/anitya:z
-      - ./docs/:/app/docs:z
+      - .:/app:z
     restart: unless-stopped
     environment:
+      - ANITYA_WEB_CONFIG=anitya.toml
       - FLASK_APP=anitya.wsgi
+      - FLASK_DEBUG=1
       - START_COMMAND=flask run -h 0.0.0.0
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "5000" ]
+      interval: 3s
+      timeout: 3s
+      retries: 30
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_started
 
-  anitya-librariesio-consumer:
+  anitya-check-service:
     image: anitya-base
-    build:
-      context: .
-      dockerfile: Containerfile.dev
-      args:
-        FEDORA_VERSION: 38
-    container_name: "anitya-librariesio-consumer"
+    container_name: "anitya-check-service"
     volumes:
-      - ./anitya/:/app/anitya:z
-      - ./docs/:/app/docs:z
+      - .:/app:z
     restart: unless-stopped
     environment:
-      - START_COMMAND=librariesio_consumer
+      - ANITYA_WEB_CONFIG=anitya.toml
+      - START_COMMAND=check_service
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_started
 
@@ -49,7 +50,6 @@ services:
     container_name: "rabbitmq"
     restart: unless-stopped
     ports:
-      - "5672:5672"
       - "15672:15672"
     healthcheck:
       test: [ "CMD", "nc", "-z", "localhost", "5672" ]
@@ -61,13 +61,11 @@ services:
       - RABBITMQ_DEFAULT_PASS=anitya
 
   postgres:
-    image: docker.io/library/postgres:13.4
+    image: docker.io/library/postgres:16.13
     container_name: "postgres"
     user: postgres
-    ports:
-      - "5432:5432"
     volumes:
-      - .container/dump:/dump
+      - .container/dump:/dump:z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 3s
